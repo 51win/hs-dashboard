@@ -298,6 +298,176 @@
   }
   .editor .cl-imp { margin-left: auto; }
 
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .tab {
+    font: inherit;
+    font-size: var(--fs-body);
+    font-weight: 500;
+    color: var(--ink-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 9px 14px;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
+    border-radius: var(--radius-badge) var(--radius-badge) 0 0;
+  }
+  .tab:hover { color: var(--ink); background: var(--surface); }
+  .tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .tab[aria-selected="true"] {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  /* Today tab */
+  .today-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .today-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 10px 14px;
+  }
+  .today-row .t-task {
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+    flex: 0 0 auto;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .today-row .t-item {
+    font-size: var(--fs-body);
+    color: var(--ink);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .dday {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-badge);
+    background: var(--status-todo-bg);
+    color: var(--status-todo-ink);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    flex: 0 0 auto;
+  }
+  .dday.urgent {
+    background: oklch(0.95 0.05 25);
+    color: var(--risk-ink);
+  }
+  .empty {
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+    padding: 8px 2px;
+  }
+
+  /* Token charts */
+  .chart {
+    display: block;
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    margin-bottom: 8px;
+  }
+  .chart .ax { font-size: 11px; fill: var(--ink-muted); }
+  .chart .ax-lbl {
+    font-size: 11px;
+    fill: var(--ink);
+  }
+
+  /* Editor v2 additions */
+  .editor .name-input { font-weight: 500; max-width: 100%; }
+  .editor .cl-item {
+    flex-wrap: wrap;
+  }
+  .editor .cl-text { flex: 1 1 140px; min-width: 100px; }
+  .editor .cl-note { flex: 1 1 120px; min-width: 90px; }
+  .editor .cl-due { flex: 0 0 auto; }
+  .editor .cl-del {
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--risk-ink);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
+  }
+  .editor .cl-del:hover { border-color: var(--risk-ink); background: oklch(0.97 0.02 25); }
+  .editor .cl-del:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+  .editor .cl-add,
+  .editor .tok-add {
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 6px 12px;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
+  }
+  .editor .cl-add:hover,
+  .editor .tok-add:hover { background: oklch(0.96 0.006 270); border-color: var(--primary-weak); }
+  .editor .cl-add:focus-visible,
+  .editor .tok-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .editor .tok-edit {
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .editor .tok-fields {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .editor .tok-num { max-width: 110px; }
+  .editor .tok-est {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+  }
+  .editor .tok-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .editor .tok-row {
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       transition: none !important;
@@ -308,6 +478,7 @@
 </head>
 <body>
 <div id="app"></div>
+<script src="dashboard-tokens.js"></script>
 <script>
 (function (global) {
   "use strict";
@@ -319,7 +490,7 @@
       { id: "g_personal", name: "개인", kind: "personal", order: 2 }
     ],
     tasks: [
-      { id: "t1", groupId: "g_team", name: "과제 1", status: "in_progress", owner: "한승", memo: "", checklist: [ { id: "t1c1", text: "설계 확정", done: true, importance: "high" }, { id: "t1c2", text: "구현", done: false, importance: "mid" } ], issues: [], tokens: [] },
+      { id: "t1", groupId: "g_team", name: "과제 1", status: "in_progress", owner: "한승", memo: "", checklist: [ { id: "t1c1", text: "설계 확정", note: "", done: true, importance: "high", due: "", doneAt: "" }, { id: "t1c2", text: "구현", note: "", done: false, importance: "mid", due: "", doneAt: "" } ], issues: [], tokens: [] },
       { id: "t2", groupId: "g_team", name: "과제 2", status: "todo", owner: "미정", memo: "", checklist: [], issues: [], tokens: [] },
       { id: "t3", groupId: "g_team", name: "과제 3", status: "done", owner: "지민", memo: "", checklist: [], issues: [], tokens: [] },
       { id: "t4", groupId: "g_team", name: "과제 4", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] },
@@ -356,6 +527,63 @@
     return Math.round((done / total) * 100);
   }
 
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function parseDate(s) {
+    var p = String(s).split("-");
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  function daysBetween(due, today) {
+    var ms = parseDate(due).getTime() - parseDate(today).getTime();
+    return Math.round(ms / 86400000);
+  }
+  function ddayLabel(due, today) {
+    if (!due) return "";
+    var diff = daysBetween(due, today);
+    if (diff === 0) return "D-DAY";
+    if (diff > 0) return "D-" + diff;
+    return "D+" + (-diff);
+  }
+  function isUrgent(due, today) {
+    if (due === "" || due == null) return false;
+    var diff = daysBetween(due, today);
+    return diff < 0 || (diff >= 0 && diff <= 2);
+  }
+  function endOfWeek(today) {
+    // Sunday of the current week (inclusive). getDay(): 0=Sun..6=Sat.
+    var d = parseDate(today);
+    var dow = d.getDay();
+    var add = (7 - dow) % 7; // days until Sunday
+    d.setDate(d.getDate() + add);
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function collectToday(data, today) {
+    var dueToday = [], doneToday = [], dueThisWeek = [];
+    var eow = endOfWeek(today);
+    (data.tasks || []).forEach(function (t) {
+      (t.checklist || []).forEach(function (item) {
+        var entry = { taskId: t.id, taskName: t.name, item: item };
+        if (item.due === today && !item.done) dueToday.push(entry);
+        if (item.doneAt === today) doneToday.push(entry);
+        if (!item.done && item.due && item.due >= today && item.due <= eow) dueThisWeek.push(entry);
+      });
+    });
+    return { dueToday: dueToday, doneToday: doneToday, dueThisWeek: dueThisWeek };
+  }
+  function taskTokenTotal(task) {
+    return (task.tokens || []).reduce(function (sum, e) { return sum + (Number(e.tokens) || 0); }, 0);
+  }
+  function dailyTokenSeries() {
+    var dt = global.DASHBOARD_TOKENS;
+    if (!dt || !Array.isArray(dt.daily)) return [];
+    return dt.daily.slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+  }
+
   var STORAGE_KEY = "dashboard-data";
   function saveData(data) {
     global.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -389,37 +617,61 @@
   }
 
   function editorHtml(t) {
-    var rows = t.checklist.map(function (c) {
-      return '<label class="cl-item"><input type="checkbox" class="cl-done" data-item-id="' + c.id + '"' +
-        (c.done ? " checked" : "") + ">" + esc(c.text) +
+    var rows = (t.checklist || []).map(function (c) {
+      return '<div class="cl-item" data-item-id="' + c.id + '">' +
+        '<input type="checkbox" class="cl-done" data-item-id="' + c.id + '"' + (c.done ? " checked" : "") + ">" +
+        '<input class="cl-text" data-item-id="' + c.id + '" value="' + esc(c.text) + '">' +
         '<select class="cl-imp" data-item-id="' + c.id + '">' +
         ['high','mid','low'].map(function (v) {
           return '<option value="' + v + '"' + (c.importance === v ? " selected" : "") + ">" + importanceLabel(v) + "</option>";
-        }).join("") + "</select></label>";
+        }).join("") + "</select>" +
+        '<input class="cl-note" data-item-id="' + c.id + '" placeholder="설명" value="' + esc(c.note || "") + '">' +
+        '<input class="cl-due" type="date" data-item-id="' + c.id + '" value="' + esc(c.due || "") + '">' +
+        '<button class="cl-del" type="button" data-item-id="' + c.id + '" aria-label="항목 삭제">삭제</button>' +
+        "</div>";
+    }).join("");
+    var tokRows = (t.tokens || []).map(function (e) {
+      return '<li class="tok-row">' + esc(e.date) + " · " + (Number(e.tokens) || 0) + " tok" +
+        (e.estimated ? " (예상)" : "") + "</li>";
     }).join("");
     return '<div class="editor" data-task-id="' + t.id + '" hidden>' +
+      '<input class="name-input" value="' + esc(t.name) + '" aria-label="과제 이름">' +
       '<select class="status">' + ['todo','in_progress','done'].map(function (v) {
         return '<option value="' + v + '"' + (t.status === v ? " selected" : "") + ">" + statusLabel(v) + "</option>";
       }).join("") + "</select>" +
       '<input class="owner-input" value="' + esc(t.owner) + '">' +
       '<div class="checklist">' + rows + "</div>" +
-      '<textarea class="memo">' + esc(t.memo) + "</textarea></div>";
+      '<button class="cl-add" type="button">+ 항목 추가</button>' +
+      '<textarea class="memo">' + esc(t.memo) + "</textarea>" +
+      '<div class="tok-edit"><div class="tok-fields">' +
+        '<input class="tok-date" type="date" aria-label="토큰 날짜">' +
+        '<input class="tok-num" type="number" min="0" placeholder="토큰수" aria-label="토큰수">' +
+        '<label class="tok-est"><input type="checkbox" class="tok-estimated"> 예상</label>' +
+        '<button class="tok-add" type="button">추가</button>' +
+      '</div><ul class="tok-list">' + tokRows + '</ul></div>' +
+      "</div>";
   }
 
-  function render(data, rootEl) {
+  function tabBarHtml() {
+    var tabs = [["board","대시보드"],["today","오늘"],["tokens","토큰"]];
+    return '<div class="tabs" role="tablist">' + tabs.map(function (p) {
+      return '<button class="tab" role="tab" data-tab="' + p[0] + '"' +
+        (_tab === p[0] ? ' aria-selected="true"' : ' aria-selected="false"') + ">" + p[1] + "</button>";
+    }).join("") + "</div>";
+  }
+
+  function boardHtml(data) {
     var team = groupByKind(data, "team_goal");
     var small = groupByKind(data, "small");
     var personal = groupByKind(data, "personal");
     var html = '<div class="toolbar"><button id="export-btn">내보내기</button>' +
       '<input id="import-input" type="file" accept="application/json"></div>';
-
     html += "<h2>" + esc(team.name) + " (6)</h2><div class=\"grid6\">";
     tasksInGroup(data, team.id).forEach(function (t) {
       html += '<div class="card" tabindex="0" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
         '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + editorHtml(t) + "</div>";
     });
     html += "</div>";
-
     [small, personal].forEach(function (g) {
       if (!g) return;
       html += "<h2>" + esc(g.name) + "</h2>";
@@ -428,15 +680,128 @@
           '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + editorHtml(t) + "</div>";
       });
     });
+    return html;
+  }
 
-    rootEl.innerHTML = html;
+  function todayRowHtml(entry, today) {
+    var due = entry.item.due || "";
+    var label = ddayLabel(due, today);
+    var badge = label ? '<span class="dday' + (isUrgent(due, today) ? " urgent" : "") + '">' + label + "</span>" : "";
+    return '<div class="today-row"><span class="t-task">' + esc(entry.taskName) + "</span>" +
+      '<span class="t-item">' + esc(entry.item.text) + "</span>" + badge + "</div>";
+  }
+
+  function todaySection(title, list, today) {
+    var body = list.length
+      ? list.map(function (e) { return todayRowHtml(e, today); }).join("")
+      : '<div class="empty">항목이 없습니다.</div>';
+    return "<h2>" + title + "</h2><div class=\"today-list\">" + body + "</div>";
+  }
+
+  function todayHtml(data) {
+    var today = todayStr();
+    var c = collectToday(data, today);
+    return todaySection("오늘 할 일", c.dueToday, today) +
+      todaySection("오늘 완료", c.doneToday, today) +
+      todaySection("이번 주 기한", c.dueThisWeek, today);
+  }
+
+  function trendChartSvg(series) {
+    if (!series.length) return '<div class="empty">토큰 추이 데이터가 없습니다.</div>';
+    var W = 600, H = 200, padL = 44, padB = 28, padT = 12, padR = 12;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var max = series.reduce(function (m, d) { return Math.max(m, Number(d.tokens) || 0); }, 0) || 1;
+    var n = series.length;
+    var bw = plotW / n;
+    var bars = series.map(function (d, i) {
+      var v = Number(d.tokens) || 0;
+      var h = Math.round((v / max) * plotH);
+      var x = padL + i * bw + bw * 0.15;
+      var y = padT + (plotH - h);
+      var lbl = n <= 12 ? '<text x="' + (x + bw * 0.35) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + esc(d.date.slice(5)) + "</text>" : "";
+      return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.7) + '" height="' + h +
+        '" rx="2" fill="var(--primary)"></rect>' + lbl;
+    }).join("");
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="전체 토큰 추이">' +
+      '<text x="' + padL + '" y="' + (padT + 4) + '" class="ax" text-anchor="end" dx="-4">' + max + "</text>" +
+      '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '" stroke="var(--border)"></line>' +
+      bars + "</svg>";
+  }
+
+  function compareChartSvg(data) {
+    var items = (data.tasks || []).map(function (t) {
+      return { name: t.name, total: taskTokenTotal(t) };
+    }).filter(function (x) { return x.total > 0; });
+    if (!items.length) return '<div class="empty">과제별 토큰 데이터가 없습니다.</div>';
+    var max = items.reduce(function (m, x) { return Math.max(m, x.total); }, 0) || 1;
+    var rowH = 26, padL = 4, labelW = 160, valW = 50, gap = 8;
+    var W = 600, barAreaW = W - labelW - valW - gap * 2 - padL;
+    var H = items.length * rowH + 8;
+    var rows = items.map(function (x, i) {
+      var y = i * rowH + 4;
+      var w = Math.max(2, Math.round((x.total / max) * barAreaW));
+      return '<text x="' + padL + '" y="' + (y + 15) + '" class="ax-lbl">' + esc(x.name) + "</text>" +
+        '<rect x="' + (padL + labelW + gap) + '" y="' + (y + 5) + '" width="' + w + '" height="14" rx="2" fill="var(--primary-weak)"></rect>' +
+        '<text x="' + (padL + labelW + gap + w + 6) + '" y="' + (y + 16) + '" class="ax">' + x.total + "</text>";
+    }).join("");
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="과제별 토큰 비교">' + rows + "</svg>";
+  }
+
+  function tokensHtml(data) {
+    return "<h2>전체 추이</h2>" + trendChartSvg(dailyTokenSeries()) +
+      "<h2>과제별 비교</h2>" + compareChartSvg(data);
+  }
+
+  function render(data, rootEl) {
+    var body;
+    if (_tab === "today") body = todayHtml(data);
+    else if (_tab === "tokens") body = tokensHtml(data);
+    else body = boardHtml(data);
+    rootEl.innerHTML = tabBarHtml() + body;
   }
 
   function findTask(data, taskId) { return data.tasks.find(function (t) { return t.id === taskId; }); }
   function toggleChecklistItem(data, taskId, itemId) {
     var t = findTask(data, taskId); if (!t) return data;
     var it = t.checklist.find(function (c) { return c.id === itemId; });
-    if (it) it.done = !it.done;
+    if (it) {
+      it.done = !it.done;
+      it.doneAt = it.done ? todayStr() : "";
+    }
+    return data;
+  }
+  function setTaskName(data, taskId, name) {
+    var t = findTask(data, taskId); if (t) t.name = name;
+    return data;
+  }
+  function addChecklistItem(data, taskId) {
+    var t = findTask(data, taskId); if (!t) return null;
+    if (!t.checklist) t.checklist = [];
+    var id = taskId + "c" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    t.checklist.push({ id: id, text: "새 항목", note: "", done: false, importance: "mid", due: "", doneAt: "" });
+    return id;
+  }
+  function removeChecklistItem(data, taskId, itemId) {
+    var t = findTask(data, taskId); if (!t) return data;
+    t.checklist = (t.checklist || []).filter(function (c) { return c.id !== itemId; });
+    return data;
+  }
+  function setChecklistNote(data, taskId, itemId, note) {
+    var t = findTask(data, taskId); if (!t) return data;
+    var it = t.checklist.find(function (c) { return c.id === itemId; });
+    if (it) it.note = note;
+    return data;
+  }
+  function setChecklistDue(data, taskId, itemId, due) {
+    var t = findTask(data, taskId); if (!t) return data;
+    var it = t.checklist.find(function (c) { return c.id === itemId; });
+    if (it) it.due = due;
+    return data;
+  }
+  function setChecklistText(data, taskId, itemId, text) {
+    var t = findTask(data, taskId); if (!t) return data;
+    var it = t.checklist.find(function (c) { return c.id === itemId; });
+    if (it) it.text = text;
     return data;
   }
   function setChecklistImportance(data, taskId, itemId, importance) {
@@ -450,8 +815,9 @@
     return data;
   }
 
-  var _state = null, _root = null, _bound = false;
+  var _state = null, _root = null, _bound = false, _tab = "board";
   function rerender() { render(_state, _root); }
+  function setTab(tab) { _tab = tab; rerender(); }
   function openEditor(taskId) {
     var ed = _root.querySelector('.editor[data-task-id="' + taskId + '"]');
     if (ed) ed.hidden = !ed.hidden;
@@ -474,6 +840,10 @@
     if (_bound) return;
     _bound = true;
     rootEl.addEventListener("click", function (e) {
+      if (e.target.classList && e.target.classList.contains("tab")) {
+        setTab(e.target.getAttribute("data-tab"));
+        return;
+      }
       if (e.target.id === "export-btn") {
         var blob = new global.Blob([exportData(_state)], { type: "application/json" });
         var url = global.URL.createObjectURL(blob);
@@ -482,7 +852,28 @@
         global.URL.revokeObjectURL(url);
         return;
       }
-      if (e.target.closest(".editor")) return;
+      if (e.target.closest(".editor")) {
+        var taskId = closestTaskId(e.target);
+        if (e.target.classList.contains("cl-del")) {
+          removeChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
+          persist(); rerender(); openEditor(taskId);
+        } else if (e.target.classList.contains("cl-add")) {
+          addChecklistItem(_state, taskId);
+          persist(); rerender(); openEditor(taskId);
+        } else if (e.target.classList.contains("tok-add")) {
+          var ed = e.target.closest(".editor");
+          var dateEl = ed.querySelector(".tok-date");
+          var numEl = ed.querySelector(".tok-num");
+          var estEl = ed.querySelector(".tok-estimated");
+          var t = findTask(_state, taskId);
+          if (t && numEl.value !== "") {
+            if (!t.tokens) t.tokens = [];
+            t.tokens.push({ date: dateEl.value || todayStr(), tokens: Number(numEl.value) || 0, estimated: !!(estEl && estEl.checked), note: "" });
+            persist(); rerender(); openEditor(taskId);
+          }
+        }
+        return;
+      }
       var card = e.target.closest(".card, .row");
       if (card) openEditor(card.getAttribute("data-task-id"));
     });
@@ -499,6 +890,7 @@
       if (e.target.classList.contains("status")) setTaskStatus(_state, taskId, e.target.value);
       else if (e.target.classList.contains("cl-done")) toggleChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
       else if (e.target.classList.contains("cl-imp")) setChecklistImportance(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
+      else if (e.target.classList.contains("cl-due")) setChecklistDue(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
       else return;
       persist(); rerender(); openEditor(taskId);
     });
@@ -515,6 +907,9 @@
       var t = findTask(_state, taskId); if (!t) return;
       if (e.target.classList.contains("owner-input")) t.owner = e.target.value;
       else if (e.target.classList.contains("memo")) t.memo = e.target.value;
+      else if (e.target.classList.contains("name-input")) setTaskName(_state, taskId, e.target.value);
+      else if (e.target.classList.contains("cl-note")) setChecklistNote(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
+      else if (e.target.classList.contains("cl-text")) setChecklistText(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
       else return;
       persist();
     });
@@ -535,6 +930,19 @@
     toggleChecklistItem: toggleChecklistItem,
     setChecklistImportance: setChecklistImportance,
     setTaskStatus: setTaskStatus,
+    setTaskName: setTaskName,
+    addChecklistItem: addChecklistItem,
+    removeChecklistItem: removeChecklistItem,
+    setChecklistNote: setChecklistNote,
+    setChecklistDue: setChecklistDue,
+    setChecklistText: setChecklistText,
+    todayStr: todayStr,
+    ddayLabel: ddayLabel,
+    isUrgent: isUrgent,
+    collectToday: collectToday,
+    taskTokenTotal: taskTokenTotal,
+    dailyTokenSeries: dailyTokenSeries,
+    setTab: setTab,
     init: init,
     applyImportedJson: applyImportedJson
   };
