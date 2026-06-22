@@ -72,53 +72,47 @@
   }
   h2:first-of-type { margin-top: 8px; }
 
-  /* Toolbar */
-  .toolbar {
+  /* App header: tabs (left) + utility actions (right) */
+  .appbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .bar-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+    gap: 8px;
+    padding-bottom: 7px;
   }
-  .toolbar #export-btn {
+  #export-btn, .import-btn {
     font: inherit;
     font-size: var(--fs-sub);
     font-weight: 500;
-    color: #fff;
-    background: var(--primary);
-    border: 1px solid var(--primary);
     border-radius: var(--radius-badge);
     padding: 7px 14px;
     cursor: pointer;
-    transition: background 150ms ease-out, border-color 150ms ease-out;
+    transition: background 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
   }
-  .toolbar #export-btn:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
-  .toolbar #export-btn:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
-  }
-  .toolbar #import-input {
-    font: inherit;
-    font-size: var(--fs-sub);
-    color: var(--ink-muted);
-  }
-  .toolbar #import-input::-webkit-file-upload-button,
-  .toolbar #import-input::file-selector-button {
-    font: inherit;
-    font-size: var(--fs-sub);
-    font-weight: 500;
+  #export-btn {
     color: var(--primary);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-badge);
-    padding: 6px 12px;
-    margin-right: 10px;
-    cursor: pointer;
-    transition: background 150ms ease-out;
   }
-  .toolbar #import-input::file-selector-button:hover { background: oklch(0.96 0.006 270); }
+  #export-btn:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  #export-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .import-btn {
+    display: inline-flex;
+    align-items: center;
+    color: var(--ink-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+  }
+  .import-btn:hover { color: var(--ink); border-color: var(--primary-weak); }
+  .import-btn:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   /* Team grid 3x2 */
   .grid6 {
@@ -305,6 +299,7 @@
     border-bottom: 1px solid var(--border);
     margin-bottom: 20px;
   }
+  .appbar .tabs { border-bottom: none; margin-bottom: -1px; }
   .tab {
     font: inherit;
     font-size: var(--fs-body);
@@ -326,7 +321,31 @@
     border-bottom-color: var(--primary);
   }
 
-  /* Today tab */
+  /* Today panel (landing) */
+  .today-lead {
+    font-size: var(--fs-h1);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 4px 0 16px;
+  }
+  .today-h {
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
+    margin: 18px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .today-h .count {
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    color: var(--primary);
+    background: var(--status-progress-bg);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
   .today-list {
     display: flex;
     flex-direction: column;
@@ -427,12 +446,12 @@
   .small-row .sm-del:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .sm-add {
     align-self: flex-start; font: inherit; font-size: var(--fs-sub); font-weight: 500;
-    color: var(--primary); background: transparent;
-    border: 1px dashed var(--border); border-radius: var(--radius-badge);
-    padding: 7px 12px; cursor: pointer; margin-top: 2px;
+    color: var(--primary); background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-badge);
+    padding: 6px 12px; cursor: pointer; margin-top: 4px;
     transition: border-color 150ms ease-out, background 150ms ease-out;
   }
-  .sm-add:hover { border-color: var(--primary-weak); background: var(--surface); }
+  .sm-add:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
   .sm-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   /* Editor save action */
@@ -445,6 +464,17 @@
   }
   .editor .save-btn:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
   .editor .save-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+  /* Editor field labels */
+  .editor .fld { display: flex; flex-direction: column; gap: 4px; }
+  .editor .fld-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .editor .fld-row .fld { flex: 1 1 140px; }
+  .editor .fld-label {
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
+  }
 
   /* Token charts */
   .chart {
@@ -716,20 +746,28 @@
         (e.estimated ? " (예상)" : "") + "</li>";
     }).join("");
     return '<div class="editor" data-task-id="' + t.id + '" hidden>' +
-      '<input class="name-input" value="' + esc(t.name) + '" aria-label="과제 이름">' +
-      '<select class="status">' + ['todo','in_progress','done'].map(function (v) {
-        return '<option value="' + v + '"' + (t.status === v ? " selected" : "") + ">" + statusLabel(v) + "</option>";
-      }).join("") + "</select>" +
-      '<input class="owner-input" value="' + esc(t.owner) + '">' +
-      '<div class="checklist">' + rows + "</div>" +
-      '<button class="cl-add" type="button">+ 항목 추가</button>' +
-      '<textarea class="memo">' + esc(t.memo) + "</textarea>" +
+      '<label class="fld"><span class="fld-label">이름</span>' +
+        '<input class="name-input" value="' + esc(t.name) + '"></label>' +
+      '<div class="fld-row">' +
+        '<label class="fld"><span class="fld-label">상태</span><select class="status">' +
+          ['todo','in_progress','done'].map(function (v) {
+            return '<option value="' + v + '"' + (t.status === v ? " selected" : "") + ">" + statusLabel(v) + "</option>";
+          }).join("") + "</select></label>" +
+        '<label class="fld"><span class="fld-label">담당</span>' +
+          '<input class="owner-input" value="' + esc(t.owner) + '"></label>' +
+      "</div>" +
+      '<div class="fld"><span class="fld-label">체크리스트</span>' +
+        '<div class="checklist">' + rows + "</div>" +
+        '<button class="cl-add" type="button">+ 항목 추가</button></div>' +
+      '<label class="fld"><span class="fld-label">메모</span>' +
+        '<textarea class="memo">' + esc(t.memo) + "</textarea></label>" +
+      '<div class="fld"><span class="fld-label">토큰 기록</span>' +
       '<div class="tok-edit"><div class="tok-fields">' +
         '<input class="tok-date" type="date" aria-label="토큰 날짜">' +
         '<input class="tok-num" type="number" min="0" placeholder="토큰수" aria-label="토큰수">' +
         '<label class="tok-est"><input type="checkbox" class="tok-estimated"> 예상</label>' +
         '<button class="tok-add" type="button">추가</button>' +
-      '</div><ul class="tok-list">' + tokRows + '</ul></div>' +
+      '</div><ul class="tok-list">' + tokRows + '</ul></div></div>' +
       '<div class="editor-actions"><button class="save-btn" type="button">저장</button></div>' +
       "</div>";
   }
@@ -766,9 +804,7 @@
     var small = groupByKind(data, "small");
     var personal = groupByKind(data, "personal");
     // 랜딩 상단: 오늘 해야 할 것.
-    var html = '<section class="today-panel">' + todayHtml(data) + '</section>';
-    html += '<div class="toolbar"><button id="export-btn">내보내기</button>' +
-      '<input id="import-input" type="file" accept="application/json"></div>';
+    var html = '<section class="today-panel" aria-label="오늘">' + todayHtml(data) + '</section>';
     html += "<h2>" + esc(team.name) + " (6)</h2><div class=\"grid6\">";
     tasksInGroup(data, team.id).forEach(function (t) {
       html += '<div class="card" tabindex="0" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
@@ -794,19 +830,21 @@
       '<span class="t-item">' + esc(entry.item.text) + "</span>" + badge + "</div>";
   }
 
-  function todaySection(title, list, today) {
+  function todaySection(title, list, today, emptyMsg) {
+    var count = list.length ? ' <span class="count">' + list.length + "</span>" : "";
     var body = list.length
       ? list.map(function (e) { return todayRowHtml(e, today); }).join("")
-      : '<div class="empty">항목이 없습니다.</div>';
-    return "<h2>" + title + "</h2><div class=\"today-list\">" + body + "</div>";
+      : '<div class="empty">' + emptyMsg + "</div>";
+    return '<h3 class="today-h">' + title + count + "</h3><div class=\"today-list\">" + body + "</div>";
   }
 
   function todayHtml(data) {
     var today = todayStr();
     var c = collectToday(data, today);
-    return todaySection("오늘 할 일", c.dueToday, today) +
-      todaySection("오늘 완료", c.doneToday, today) +
-      todaySection("이번 주 기한", c.dueThisWeek, today);
+    return '<h2 class="today-lead">오늘</h2>' +
+      todaySection("오늘 할 일", c.dueToday, today, "오늘 마감인 항목이 없어요.") +
+      todaySection("오늘 완료", c.doneToday, today, "아직 오늘 완료한 항목이 없어요.") +
+      todaySection("이번 주 기한", c.dueThisWeek, today, "이번 주 마감 항목이 없어요.");
   }
 
   function trendChartSvg(series) {
@@ -856,10 +894,14 @@
   }
 
   function render(data, rootEl) {
-    var body;
-    if (_tab === "tokens") body = tokensHtml(data);
-    else body = boardHtml(data);
-    rootEl.innerHTML = tabBarHtml() + body;
+    var actions = _tab === "tokens" ? "" :
+      '<div class="bar-actions">' +
+      '<button id="export-btn" type="button">내보내기</button>' +
+      '<label class="import-btn">가져오기<input id="import-input" type="file" accept="application/json" hidden></label>' +
+      '</div>';
+    var header = '<div class="appbar">' + tabBarHtml() + actions + "</div>";
+    var body = _tab === "tokens" ? tokensHtml(data) : boardHtml(data);
+    rootEl.innerHTML = header + body;
   }
 
   function findTask(data, taskId) { return data.tasks.find(function (t) { return t.id === taskId; }); }

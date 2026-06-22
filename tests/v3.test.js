@@ -73,6 +73,22 @@ test("editor has a save button", () => {
   assert.ok(ed.querySelector(".save-btn"), "save button present");
 });
 
+test("app header holds tabs plus export/import; editor fields are labeled", () => {
+  const win = loadDashboard();
+  const { Dashboard, document } = win;
+  Dashboard.init(document.getElementById("app"));
+  const bar = document.querySelector(".appbar");
+  assert.ok(bar, "appbar present");
+  assert.ok(bar.querySelector(".tabs"), "tabs inside appbar");
+  assert.ok(bar.querySelector("#export-btn"), "export in appbar");
+  assert.ok(bar.querySelector(".import-btn #import-input"), "import in appbar");
+  const ed = document.querySelector('.editor[data-task-id="t1"]');
+  const labels = [...ed.querySelectorAll(".fld-label")].map(l => l.textContent);
+  ["이름", "상태", "담당", "체크리스트", "메모", "토큰 기록"].forEach(function (name) {
+    assert.ok(labels.includes(name), "editor labeled: " + name);
+  });
+});
+
 test("small group renders as checklist rows with add button", () => {
   const win = loadDashboard();
   const { Dashboard, document } = win;
