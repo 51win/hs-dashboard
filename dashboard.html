@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 대시보드</title>
+<style>
+  :root {
+    /* Surfaces & text */
+    --bg: oklch(1 0 0);
+    --surface: oklch(0.985 0.003 270);
+    --border: oklch(0.90 0.004 270);
+    --ink: oklch(0.22 0.02 270);
+    --ink-muted: oklch(0.46 0.02 270);
+
+    /* Brand / action */
+    --primary: oklch(0.42 0.18 270);
+    --primary-weak: oklch(0.55 0.10 270);
+    --focus-ring: oklch(0.55 0.16 270);
+
+    /* Status colors (fill / text) */
+    --status-todo-bg: oklch(0.95 0.004 270);
+    --status-todo-ink: oklch(0.40 0.01 270);
+    --status-progress-bg: oklch(0.95 0.03 270);
+    --status-progress-ink: oklch(0.40 0.15 270);
+    --status-done-bg: oklch(0.95 0.04 150);
+    --status-done-ink: oklch(0.40 0.12 150);
+    --risk-ink: oklch(0.45 0.16 25);
+
+    /* Progress track */
+    --track: oklch(0.93 0.004 270);
+
+    /* Type scale (fixed rem) */
+    --fs-h1: 1.5rem;
+    --fs-h2: 1.125rem;
+    --fs-task: 0.9375rem;
+    --fs-body: 0.9375rem;
+    --fs-sub: 0.8125rem;
+    --fs-micro: 0.6875rem;
+
+    --radius-card: 8px;
+    --radius-badge: 6px;
+    --radius-bar: 3px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--bg); }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    margin: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #app {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  h2 {
+    font-size: var(--fs-h2);
+    font-weight: 600;
+    color: var(--ink);
+    margin: 32px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h2:first-of-type { margin-top: 8px; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .toolbar #export-btn {
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: #fff;
+    background: var(--primary);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-badge);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
+  }
+  .toolbar #export-btn:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
+  .toolbar #export-btn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .toolbar #import-input {
+    font: inherit;
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+  }
+  .toolbar #import-input::-webkit-file-upload-button,
+  .toolbar #import-input::file-selector-button {
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 6px 12px;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: background 150ms ease-out;
+  }
+  .toolbar #import-input::file-selector-button:hover { background: oklch(0.96 0.006 270); }
+
+  /* Team grid 3x2 */
+  .grid6 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 880px) { .grid6 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .grid6 { grid-template-columns: 1fr; } }
+
+  /* Cards & rows */
+  .card, .row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    cursor: pointer;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
+  }
+  .card { padding: 13px 14px; }
+  .card:hover, .row:hover { border-color: var(--primary-weak); }
+  .card:focus-visible, .row:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .card .t-name {
+    font-size: var(--fs-task);
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 10px;
+  }
+  .card .meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .card .bar { margin-bottom: 6px; }
+
+  /* Rows (small / personal) */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    margin-bottom: 8px;
+  }
+  .row .r-name {
+    flex: 1 1 auto;
+    font-size: var(--fs-task);
+    font-weight: 500;
+    color: var(--ink);
+    min-width: 0;
+  }
+  .row .bar {
+    flex: 0 0 120px;
+    width: 120px;
+    margin: 0;
+  }
+
+  /* Status badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-badge);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .badge[data-status="todo"] { background: var(--status-todo-bg); color: var(--status-todo-ink); }
+  .badge[data-status="in_progress"] { background: var(--status-progress-bg); color: var(--status-progress-ink); }
+  .badge[data-status="done"] { background: var(--status-done-bg); color: var(--status-done-ink); }
+
+  /* Owner */
+  .owner {
+    font-size: var(--fs-sub);
+    font-weight: 400;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  /* Progress bar */
+  .bar {
+    height: 5px;
+    background: var(--track);
+    border-radius: var(--radius-bar);
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    background: var(--primary-weak);
+    border-radius: var(--radius-bar);
+    transition: width 150ms ease-out;
+  }
+  .pct {
+    display: inline-block;
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    color: var(--ink-muted);
+    margin-top: 3px;
+  }
+  .row .pct { margin-top: 0; flex: 0 0 auto; min-width: 34px; text-align: right; }
+
+  /* Expandable editor */
+  .editor {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: default;
+    animation: editor-expand 150ms ease-out;
+  }
+  .editor[hidden] { display: none; }
+
+  @keyframes editor-expand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .editor select,
+  .editor input,
+  .editor textarea {
+    font: inherit;
+    font-size: var(--fs-sub);
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 6px 8px;
+    transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .editor select:hover,
+  .editor input:hover,
+  .editor textarea:hover { border-color: var(--primary-weak); }
+  .editor select:focus-visible,
+  .editor input:focus-visible,
+  .editor textarea:focus-visible,
+  .editor input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+    border-color: var(--primary-weak);
+  }
+  .editor select:disabled,
+  .editor input:disabled,
+  .editor textarea:disabled { color: var(--ink-muted); background: var(--surface); cursor: not-allowed; }
+
+  .editor input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex: 0 0 auto;
+    padding: 0;
+  }
+  .editor .owner-input { max-width: 180px; }
+  .editor textarea.memo { min-height: 56px; resize: vertical; line-height: 1.4; }
+
+  .editor .checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .editor .cl-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-body);
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .editor .cl-imp { margin-left: auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function (global) {
+  "use strict";
+  var SEED = {
+    version: 1,
+    groups: [
+      { id: "g_team", name: "큰 과제", kind: "team_goal", order: 0 },
+      { id: "g_small", name: "작은 과제", kind: "small", order: 1 },
+      { id: "g_personal", name: "개인", kind: "personal", order: 2 }
+    ],
+    tasks: [
+      { id: "t1", groupId: "g_team", name: "과제 1", status: "in_progress", owner: "한승", memo: "", checklist: [ { id: "t1c1", text: "설계 확정", done: true, importance: "high" }, { id: "t1c2", text: "구현", done: false, importance: "mid" } ], issues: [], tokens: [] },
+      { id: "t2", groupId: "g_team", name: "과제 2", status: "todo", owner: "미정", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "t3", groupId: "g_team", name: "과제 3", status: "done", owner: "지민", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "t4", groupId: "g_team", name: "과제 4", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "t5", groupId: "g_team", name: "과제 5", status: "in_progress", owner: "수아", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "t6", groupId: "g_team", name: "과제 6", status: "todo", owner: "미정", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "s1", groupId: "g_small", name: "데이터 마이그레이션 CSV 정리", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "p1", groupId: "g_personal", name: "주간 진행 리포트 자동화", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] }
+    ]
+  };
+
+  function defaultData() { return JSON.parse(JSON.stringify(SEED)); }
+  function tasksInGroup(data, groupId) {
+    return data.tasks.filter(function (t) { return t.groupId === groupId; });
+  }
+  function groupByKind(data, kind) {
+    return data.groups.find(function (g) { return g.kind === kind; });
+  }
+
+  function statusToProgress(status) {
+    if (status === "done") return 100;
+    if (status === "in_progress") return 50;
+    return 0;
+  }
+  function taskProgress(task) {
+    if (task.status === "done") return 100;
+    var list = task.checklist || [];
+    if (list.length === 0) return statusToProgress(task.status);
+    var total = 0, done = 0;
+    for (var i = 0; i < list.length; i++) {
+      var w = Dashboard.WEIGHTS[list[i].importance] || Dashboard.WEIGHTS.mid;
+      total += w;
+      if (list[i].done) done += w;
+    }
+    return Math.round((done / total) * 100);
+  }
+
+  var STORAGE_KEY = "dashboard-data";
+  function saveData(data) {
+    global.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+  function loadData() {
+    var raw = global.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultData();
+    try { return importData(raw); } catch (e) { return defaultData(); }
+  }
+  function exportData(data) { return JSON.stringify(data, null, 2); }
+  function importData(jsonString) {
+    var obj = JSON.parse(jsonString);
+    if (!obj || !Array.isArray(obj.groups) || !Array.isArray(obj.tasks)) {
+      throw new Error("invalid data: groups/tasks required");
+    }
+    return obj;
+  }
+
+  function statusLabel(s) { return s === "done" ? "완료" : s === "in_progress" ? "진행" : "예정"; }
+  function importanceLabel(i) { return i === "high" ? "상" : i === "low" ? "하" : "중"; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function metaHtml(task) {
+    return '<span class="badge" data-status="' + task.status + '">' + statusLabel(task.status) + "</span>" +
+      '<span class="owner">' + esc(task.owner || "미정") + "</span>";
+  }
+  function barHtml(task) {
+    var p = taskProgress(task);
+    return '<div class="bar"><i style="width:' + p + '%"></i></div><span class="pct">' + p + "%</span>";
+  }
+
+  function editorHtml(t) {
+    var rows = t.checklist.map(function (c) {
+      return '<label class="cl-item"><input type="checkbox" class="cl-done" data-item-id="' + c.id + '"' +
+        (c.done ? " checked" : "") + ">" + esc(c.text) +
+        '<select class="cl-imp" data-item-id="' + c.id + '">' +
+        ['high','mid','low'].map(function (v) {
+          return '<option value="' + v + '"' + (c.importance === v ? " selected" : "") + ">" + importanceLabel(v) + "</option>";
+        }).join("") + "</select></label>";
+    }).join("");
+    return '<div class="editor" data-task-id="' + t.id + '" hidden>' +
+      '<select class="status">' + ['todo','in_progress','done'].map(function (v) {
+        return '<option value="' + v + '"' + (t.status === v ? " selected" : "") + ">" + statusLabel(v) + "</option>";
+      }).join("") + "</select>" +
+      '<input class="owner-input" value="' + esc(t.owner) + '">' +
+      '<div class="checklist">' + rows + "</div>" +
+      '<textarea class="memo">' + esc(t.memo) + "</textarea></div>";
+  }
+
+  function render(data, rootEl) {
+    var team = groupByKind(data, "team_goal");
+    var small = groupByKind(data, "small");
+    var personal = groupByKind(data, "personal");
+    var html = '<div class="toolbar"><button id="export-btn">내보내기</button>' +
+      '<input id="import-input" type="file" accept="application/json"></div>';
+
+    html += "<h2>" + esc(team.name) + " (6)</h2><div class=\"grid6\">";
+    tasksInGroup(data, team.id).forEach(function (t) {
+      html += '<div class="card" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
+        '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + editorHtml(t) + "</div>";
+    });
+    html += "</div>";
+
+    [small, personal].forEach(function (g) {
+      if (!g) return;
+      html += "<h2>" + esc(g.name) + "</h2>";
+      tasksInGroup(data, g.id).forEach(function (t) {
+        html += '<div class="row" data-task-id="' + t.id + '">' + metaHtml(t) +
+          '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + editorHtml(t) + "</div>";
+      });
+    });
+
+    rootEl.innerHTML = html;
+  }
+
+  function findTask(data, taskId) { return data.tasks.find(function (t) { return t.id === taskId; }); }
+  function toggleChecklistItem(data, taskId, itemId) {
+    var t = findTask(data, taskId); if (!t) return data;
+    var it = t.checklist.find(function (c) { return c.id === itemId; });
+    if (it) it.done = !it.done;
+    return data;
+  }
+  function setChecklistImportance(data, taskId, itemId, importance) {
+    var t = findTask(data, taskId); if (!t) return data;
+    var it = t.checklist.find(function (c) { return c.id === itemId; });
+    if (it) it.importance = importance;
+    return data;
+  }
+  function setTaskStatus(data, taskId, status) {
+    var t = findTask(data, taskId); if (t) t.status = status;
+    return data;
+  }
+
+  var _state = null, _root = null;
+  function rerender() { render(_state, _root); }
+  function openEditor(taskId) {
+    var ed = _root.querySelector('.editor[data-task-id="' + taskId + '"]');
+    if (ed) ed.hidden = !ed.hidden;
+  }
+  function persist() { saveData(_state); }
+  function closestTaskId(el) {
+    var n = el.closest("[data-task-id]");
+    return n ? n.getAttribute("data-task-id") : null;
+  }
+  function applyImportedJson(jsonString) {
+    _state = importData(jsonString);
+    persist();
+    rerender();
+    return _state;
+  }
+  function init(rootEl) {
+    _root = rootEl;
+    _state = loadData();
+    render(_state, _root);
+    rootEl.addEventListener("click", function (e) {
+      if (e.target.id === "export-btn") {
+        var blob = new global.Blob([exportData(_state)], { type: "application/json" });
+        var url = global.URL.createObjectURL(blob);
+        var a = global.document.createElement("a");
+        a.href = url; a.download = "dashboard-data.json"; a.click();
+        global.URL.revokeObjectURL(url);
+        return;
+      }
+      if (e.target.closest(".editor")) return;
+      var card = e.target.closest(".card, .row");
+      if (card) openEditor(card.getAttribute("data-task-id"));
+    });
+    rootEl.addEventListener("change", function (e) {
+      if (e.target.id === "import-input") {
+        if (!e.target.files || !e.target.files[0]) return;
+        e.target.files[0].text().then(function (txt) {
+          try { applyImportedJson(txt); } catch (err) { global.alert("가져오기 실패: " + err.message); }
+        });
+        return;
+      }
+      var taskId = closestTaskId(e.target);
+      if (!taskId) return;
+      if (e.target.classList.contains("status")) setTaskStatus(_state, taskId, e.target.value);
+      else if (e.target.classList.contains("cl-done")) toggleChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
+      else if (e.target.classList.contains("cl-imp")) setChecklistImportance(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
+      else return;
+      persist(); rerender(); openEditor(taskId);
+    });
+    rootEl.addEventListener("input", function (e) {
+      var taskId = closestTaskId(e.target);
+      if (!taskId) return;
+      var t = findTask(_state, taskId); if (!t) return;
+      if (e.target.classList.contains("owner-input")) t.owner = e.target.value;
+      else if (e.target.classList.contains("memo")) t.memo = e.target.value;
+      else return;
+      persist();
+    });
+  }
+
+  var Dashboard = {
+    WEIGHTS: { high: 3, mid: 2, low: 1 },
+    defaultData: defaultData,
+    tasksInGroup: tasksInGroup,
+    groupByKind: groupByKind,
+    statusToProgress: statusToProgress,
+    taskProgress: taskProgress,
+    loadData: loadData,
+    saveData: saveData,
+    exportData: exportData,
+    importData: importData,
+    render: render,
+    toggleChecklistItem: toggleChecklistItem,
+    setChecklistImportance: setChecklistImportance,
+    setTaskStatus: setTaskStatus,
+    init: init,
+    applyImportedJson: applyImportedJson
+  };
+  global.Dashboard = Dashboard;
+
+  if (typeof document !== "undefined") {
+    var el = document.getElementById("app");
+    if (el) Dashboard.init(el);
+  }
+})(typeof window !== "undefined" ? window : this);
+</script>
+</body>
+</html>
