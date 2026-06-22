@@ -564,6 +564,91 @@
     color: var(--ink-muted);
   }
 
+  /* Data-source: read-only banner */
+  .sheet-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: var(--status-progress-bg);
+    color: var(--primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 10px 14px;
+    margin-bottom: 20px;
+    font-size: var(--fs-sub);
+  }
+  .sheet-banner .sheet-banner-text { font-weight: 500; }
+  .sheet-banner .sheet-banner-id {
+    font-size: var(--fs-micro);
+    color: var(--ink-muted);
+    font-weight: 400;
+  }
+  .sheet-banner .sheet-banner-sync {
+    font-size: var(--fs-micro);
+    color: var(--ink-muted);
+    font-weight: 400;
+  }
+  .sheet-banner.error { color: var(--risk-ink); }
+  .sheet-banner .sheet-actions { display: flex; gap: 8px; margin-left: auto; }
+
+  /* Data-source: local connect control */
+  .sheet-connect-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sheet-id-input {
+    font: inherit;
+    font-size: var(--fs-sub);
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 6px 10px;
+    max-width: 150px;
+    transition: border-color 150ms ease-out;
+  }
+  .sheet-id-input:hover { border-color: var(--primary-weak); }
+  .sheet-id-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--primary-weak); }
+
+  /* Secondary buttons (connect / refresh / disconnect / token-refresh) */
+  .sheet-connect,
+  .sheet-refresh,
+  .sheet-disconnect,
+  .token-refresh {
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
+  }
+  .sheet-connect:hover,
+  .sheet-refresh:hover,
+  .sheet-disconnect:hover,
+  .token-refresh:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  .sheet-connect:focus-visible,
+  .sheet-refresh:focus-visible,
+  .sheet-disconnect:focus-visible,
+  .token-refresh:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .sheet-disconnect { color: var(--ink-muted); }
+  .sheet-disconnect:hover { color: var(--risk-ink); border-color: var(--risk-ink); background: var(--surface); }
+  .token-refresh { margin-bottom: 10px; }
+
+  /* Read-only board: disabled small-row checkbox + plain display */
+  .small-row .sm-done:disabled { cursor: default; opacity: 0.8; }
+  .small-row .sm-name-ro {
+    flex: 1 1 auto; min-width: 0;
+    font-size: var(--fs-task); color: var(--ink);
+  }
+  .small-row .sm-name-ro.done { color: var(--ink-muted); text-decoration: line-through; }
+  .small-row .sm-due-ro { font-size: var(--fs-sub); color: var(--ink-muted); flex: 0 0 auto; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       transition: none !important;
@@ -597,6 +682,8 @@
       { id: "p1", groupId: "g_personal", name: "주간 진행 리포트 자동화", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] }
     ]
   };
+
+  var _readonly = false, _sheetError = "", _lastSynced = "", _tokenInterval = null, _pollingEnabled = false;
 
   function defaultData() { return JSON.parse(JSON.stringify(SEED)); }
   function tasksInGroup(data, groupId) {
@@ -713,6 +800,151 @@
     return obj;
   }
 
+  // ---- Google Sheets (read-only) data source ----
+  var SHEET_ID_KEY = "dashboard-sheet-id";
+  function sheetCsvUrl(sheetId, tab) {
+    return "https://docs.google.com/spreadsheets/d/" + sheetId +
+      "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(tab);
+  }
+  function parseCsv(text) {
+    var s = String(text == null ? "" : text);
+    if (s === "") return [];
+    var rows = [], row = [], field = "", i = 0, inQuotes = false;
+    var n = s.length;
+    while (i < n) {
+      var ch = s[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (s[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += ch; i++; continue;
+      }
+      if (ch === '"') { inQuotes = true; i++; continue; }
+      if (ch === ",") { row.push(field); field = ""; i++; continue; }
+      if (ch === "\r") { i++; continue; }
+      if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+      field += ch; i++;
+    }
+    row.push(field);
+    rows.push(row);
+    // ignore a single trailing empty line (one row with one empty cell)
+    if (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") {
+      rows.pop();
+    }
+    return rows;
+  }
+  function csvToObjects(text) {
+    var rows = parseCsv(text);
+    if (!rows.length) return [];
+    var header = rows[0].map(function (h) { return String(h).trim(); });
+    var out = [];
+    for (var r = 1; r < rows.length; r++) {
+      var obj = {};
+      for (var c = 0; c < header.length; c++) {
+        obj[header[c]] = rows[r][c] != null ? rows[r][c] : "";
+      }
+      out.push(obj);
+    }
+    return out;
+  }
+  function truthyCsv(v) {
+    var s = String(v == null ? "" : v).trim().toLowerCase();
+    return s === "true" || s === "1" || s === "y" || s === "yes" || s === "o";
+  }
+  function SHEET_GROUPS() {
+    return [
+      { id: "g_team", name: "큰 과제", kind: "team_goal", order: 0 },
+      { id: "g_small", name: "작은 과제", kind: "small", order: 1 },
+      { id: "g_personal", name: "개인", kind: "personal", order: 2 }
+    ];
+  }
+  function groupToGroupId(group) {
+    if (group === "small") return "g_small";
+    if (group === "personal") return "g_personal";
+    if (group === "team_goal") return "g_team";
+    return "g_team";
+  }
+  function parseSheetData(tasksCsv, checklistCsv) {
+    var taskObjs = csvToObjects(tasksCsv);
+    var clObjs = csvToObjects(checklistCsv);
+    var tasks = taskObjs.map(function (o) {
+      return {
+        id: String(o.id || ""),
+        groupId: groupToGroupId(String(o.group || "")),
+        name: String(o.name || ""),
+        status: o.status ? String(o.status) : "todo",
+        owner: String(o.owner || ""),
+        due: String(o.due || ""),
+        doneAt: String(o.doneAt || ""),
+        memo: String(o.memo || ""),
+        note: "",
+        checklist: [],
+        issues: [],
+        tokens: []
+      };
+    });
+    var byId = {};
+    tasks.forEach(function (t) { byId[t.id] = t; });
+    clObjs.forEach(function (o) {
+      var t = byId[String(o.taskId || "")];
+      if (!t) return;
+      t.checklist.push({
+        id: String(o.id || ""),
+        text: String(o.text || ""),
+        note: String(o.note || ""),
+        importance: o.importance ? String(o.importance) : "mid",
+        done: truthyCsv(o.done),
+        due: String(o.due || ""),
+        doneAt: String(o.doneAt || "")
+      });
+    });
+    return { version: 1, groups: SHEET_GROUPS(), tasks: tasks };
+  }
+  function getSheetId() {
+    return global.localStorage.getItem(SHEET_ID_KEY) || "";
+  }
+  function setSheetId(id) {
+    global.localStorage.setItem(SHEET_ID_KEY, String(id));
+  }
+  function clearSheetId() {
+    global.localStorage.removeItem(SHEET_ID_KEY);
+  }
+  function applySheetData(parsed) {
+    _state = parsed;
+    _readonly = true;
+    rerender();
+    return _state;
+  }
+  function nowTimeStr() {
+    var d = new Date();
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
+  function loadFromSheet(sheetId) {
+    if (typeof fetch !== "function") {
+      _sheetError = "이 환경에서는 시트를 불러올 수 없어요. https(GitHub Pages)에서 사용하세요.";
+      _readonly = false;
+      rerender();
+      return Promise.resolve(null);
+    }
+    return Promise.all([
+      fetch(sheetCsvUrl(sheetId, "Tasks")).then(function (r) { return r.text(); }),
+      fetch(sheetCsvUrl(sheetId, "Checklist")).then(function (r) { return r.text(); })
+    ]).then(function (texts) {
+      var parsed = parseSheetData(texts[0], texts[1]);
+      _sheetError = "";
+      _lastSynced = nowTimeStr();
+      applySheetData(parsed);
+      return _state;
+    }).catch(function () {
+      _sheetError = "시트를 불러오지 못했어요. 잠시 후 다시 시도하세요.";
+      _readonly = false;
+      _state = loadData();
+      rerender();
+      return null;
+    });
+  }
+
   function statusLabel(s) { return s === "done" ? "완료" : s === "in_progress" ? "진행" : "예정"; }
   function importanceLabel(i) { return i === "high" ? "상" : i === "low" ? "하" : "중"; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
@@ -787,15 +1019,26 @@
       var due = t.due || "";
       var label = ddayLabel(due, today);
       var badge = label ? '<span class="dday' + (isUrgent(due, today) ? " urgent" : "") + '">' + label + "</span>" : "";
-      html += '<div class="small-row" data-task-id="' + t.id + '">' +
-        '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' aria-label="완료">' +
-        '<input class="sm-name' + (t.status === "done" ? " done" : "") + '" value="' + esc(t.name) + '" aria-label="작은 과제 이름">' +
-        '<input class="sm-due" type="date" value="' + esc(due) + '" aria-label="기한">' +
-        badge +
-        '<button class="sm-del" type="button" aria-label="삭제">삭제</button>' +
-        "</div>";
+      var doneCls = t.status === "done" ? " done" : "";
+      if (_readonly) {
+        html += '<div class="small-row" data-task-id="' + t.id + '">' +
+          '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' disabled aria-label="완료">' +
+          '<span class="sm-name-ro' + doneCls + '">' + esc(t.name) + "</span>" +
+          (due ? '<span class="sm-due-ro">' + esc(due) + "</span>" : "") +
+          badge +
+          "</div>";
+      } else {
+        html += '<div class="small-row" data-task-id="' + t.id + '">' +
+          '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' aria-label="완료">' +
+          '<input class="sm-name' + doneCls + '" value="' + esc(t.name) + '" aria-label="작은 과제 이름">' +
+          '<input class="sm-due" type="date" value="' + esc(due) + '" aria-label="기한">' +
+          badge +
+          '<button class="sm-del" type="button" aria-label="삭제">삭제</button>' +
+          "</div>";
+      }
     });
-    html += '<button class="sm-add" type="button">+ 작은 과제 추가</button></div>';
+    if (!_readonly) html += '<button class="sm-add" type="button">+ 작은 과제 추가</button>';
+    html += '</div>';
     return html;
   }
 
@@ -805,18 +1048,29 @@
     var personal = groupByKind(data, "personal");
     // 랜딩 상단: 오늘 해야 할 것.
     var html = '<section class="today-panel" aria-label="오늘">' + todayHtml(data) + '</section>';
-    html += "<h2>" + esc(team.name) + " (6)</h2><div class=\"grid6\">";
+    var teamCount = tasksInGroup(data, team.id).length;
+    html += "<h2>" + esc(team.name) + " (" + teamCount + ")</h2><div class=\"grid6\">";
     tasksInGroup(data, team.id).forEach(function (t) {
-      html += '<div class="card" tabindex="0" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
-        '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + editorHtml(t) + "</div>";
+      if (_readonly) {
+        html += '<div class="card" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
+          '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + "</div>";
+      } else {
+        html += '<div class="card" tabindex="0" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
+          '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + editorHtml(t) + "</div>";
+      }
     });
     html += "</div>";
     if (small) html += smallHtml(data, small);
     if (personal) {
       html += "<h2>" + esc(personal.name) + "</h2>";
       tasksInGroup(data, personal.id).forEach(function (t) {
-        html += '<div class="row" tabindex="0" data-task-id="' + t.id + '">' + metaHtml(t) +
-          '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + editorHtml(t) + "</div>";
+        if (_readonly) {
+          html += '<div class="row" data-task-id="' + t.id + '">' + metaHtml(t) +
+            '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + "</div>";
+        } else {
+          html += '<div class="row" tabindex="0" data-task-id="' + t.id + '">' + metaHtml(t) +
+            '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + editorHtml(t) + "</div>";
+        }
       });
     }
     return html;
@@ -889,19 +1143,78 @@
   }
 
   function tokensHtml(data) {
-    return "<h2>전체 추이</h2>" + trendChartSvg(dailyTokenSeries()) +
+    return '<button class="token-refresh" type="button">새로고침</button>' +
+      "<h2>전체 추이</h2>" + trendChartSvg(dailyTokenSeries()) +
       "<h2>과제별 비교</h2>" + compareChartSvg(data);
   }
 
-  function render(data, rootEl) {
-    var actions = _tab === "tokens" ? "" :
-      '<div class="bar-actions">' +
+  function reloadTokensSidecar(onDone) {
+    if (typeof document === "undefined" || !document.createElement || !document.head) {
+      if (onDone) onDone();
+      return;
+    }
+    var s = document.createElement("script");
+    s.src = "dashboard-tokens.js?t=" + Date.now();
+    s.onload = function () { if (onDone) onDone(); };
+    s.onerror = function () { if (onDone) onDone(); };
+    document.head.appendChild(s);
+  }
+  function refreshTokensTab() {
+    reloadTokensSidecar(function () {
+      if (_tab === "tokens") rerender();
+    });
+  }
+  function setupTokenPolling() {
+    if (typeof setInterval !== "function") return;
+    if (_tab === "tokens" && _pollingEnabled) {
+      if (_tokenInterval == null) {
+        _tokenInterval = setInterval(function () {
+          if (_tab !== "tokens") return;
+          reloadTokensSidecar(function () { if (_tab === "tokens") rerender(); });
+        }, 30000);
+        if (_tokenInterval && typeof _tokenInterval.unref === "function") _tokenInterval.unref();
+      }
+    } else if (_tokenInterval != null && typeof clearInterval === "function") {
+      clearInterval(_tokenInterval);
+      _tokenInterval = null;
+    }
+  }
+  function truncateId(id) {
+    var s = String(id || "");
+    return s.length > 12 ? s.slice(0, 9) + "…" : s;
+  }
+  function sheetBannerHtml() {
+    var sync = _lastSynced ? '<span class="sheet-banner-sync">마지막 동기화 ' + esc(_lastSynced) + "</span>" : "";
+    return '<div class="sheet-banner">' +
+      '<span class="sheet-banner-text">공개 구글 시트에서 읽는 중</span>' +
+      '<span class="sheet-banner-id">' + esc(truncateId(getSheetId())) + "</span>" +
+      sync +
+      '<span class="sheet-actions">' +
+      '<button class="sheet-refresh" type="button">새로고침</button>' +
+      '<button class="sheet-disconnect" type="button">연결 해제</button>' +
+      "</span></div>";
+  }
+  function localActionsHtml() {
+    return '<div class="bar-actions">' +
+      '<span class="sheet-connect-row">' +
+      '<input class="sheet-id-input" type="text" placeholder="구글 시트 ID" aria-label="구글 시트 ID">' +
+      '<button class="sheet-connect" type="button">연결</button>' +
+      '</span>' +
       '<button id="export-btn" type="button">내보내기</button>' +
       '<label class="import-btn">가져오기<input id="import-input" type="file" accept="application/json" hidden></label>' +
       '</div>';
+  }
+  function render(data, rootEl) {
+    var actions = _tab === "tokens" ? "" : (_readonly ? "" : localActionsHtml());
     var header = '<div class="appbar">' + tabBarHtml() + actions + "</div>";
+    var banner = "";
+    if (_tab !== "tokens") {
+      if (_readonly) banner = sheetBannerHtml();
+      else if (_sheetError) banner = '<div class="sheet-banner error"><span class="sheet-banner-text">' + esc(_sheetError) + "</span></div>";
+    }
     var body = _tab === "tokens" ? tokensHtml(data) : boardHtml(data);
-    rootEl.innerHTML = header + body;
+    rootEl.innerHTML = header + banner + body;
+    setupTokenPolling();
   }
 
   function findTask(data, taskId) { return data.tasks.find(function (t) { return t.id === taskId; }); }
@@ -1002,11 +1315,42 @@
     _root = rootEl;
     _state = loadData();
     render(_state, _root);
+    try {
+      var sid = getSheetId();
+      if (sid && typeof fetch === "function") { loadFromSheet(sid); }
+    } catch (e) { /* never throw on init */ }
     if (_bound) return;
     _bound = true;
     rootEl.addEventListener("click", function (e) {
       if (e.target.classList && e.target.classList.contains("tab")) {
-        setTab(e.target.getAttribute("data-tab"));
+        var tab = e.target.getAttribute("data-tab");
+        if (tab === "tokens") _pollingEnabled = true;
+        setTab(tab);
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("token-refresh")) {
+        _pollingEnabled = true;
+        refreshTokensTab();
+        setupTokenPolling();
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("sheet-connect")) {
+        var input = rootEl.querySelector(".sheet-id-input");
+        var val = input ? input.value.trim() : "";
+        if (val) { setSheetId(val); loadFromSheet(val); }
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("sheet-refresh")) {
+        loadFromSheet(getSheetId());
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("sheet-disconnect")) {
+        clearSheetId();
+        _readonly = false;
+        _sheetError = "";
+        _lastSynced = "";
+        _state = loadData();
+        rerender();
         return;
       }
       if (e.target.id === "export-btn") {
@@ -1124,7 +1468,16 @@
     dailyTokenSeries: dailyTokenSeries,
     setTab: setTab,
     init: init,
-    applyImportedJson: applyImportedJson
+    applyImportedJson: applyImportedJson,
+    sheetCsvUrl: sheetCsvUrl,
+    parseCsv: parseCsv,
+    parseSheetData: parseSheetData,
+    getSheetId: getSheetId,
+    setSheetId: setSheetId,
+    clearSheetId: clearSheetId,
+    applySheetData: applySheetData,
+    loadFromSheet: loadFromSheet,
+    refreshTokensTab: refreshTokensTab
   };
   global.Dashboard = Dashboard;
 
