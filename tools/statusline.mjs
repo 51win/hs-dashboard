@@ -29,7 +29,10 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_DIR = process.env.CLAUDE_DASHBOARD_DIR || path.resolve(__dirname, "..");
 const LOG_PATH = path.join(DASHBOARD_DIR, ".dashboard-token-log.json");
-const SIDECAR_PATH = path.join(DASHBOARD_DIR, "dashboard-tokens.js");
+const SIDECAR_PATHS = [
+  path.join(DASHBOARD_DIR, "dashboard-tokens.js"),
+  path.join(path.resolve(__dirname, "../../claude/Projects/dashboard"), "dashboard-tokens.js"),
+];
 
 function readStdin() {
   try { return fs.readFileSync(0, "utf8"); } catch { return ""; }
@@ -91,7 +94,9 @@ function buildDaily(log) {
 function writeSidecar(daily) {
   const payload = { generatedAt: new Date().toISOString(), daily };
   const js = "window.DASHBOARD_TOKENS = " + JSON.stringify(payload, null, 2) + ";\n";
-  try { fs.writeFileSync(SIDECAR_PATH, js); } catch { /* ignore */ }
+  for (const p of SIDECAR_PATHS) {
+    try { fs.writeFileSync(p, js); } catch { /* ignore */ }
+  }
 }
 
 function main() {
