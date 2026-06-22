@@ -12,6 +12,24 @@ test("toggleChecklistItem flips done and updates progress", () => {
   assert.equal(after, 100);
 });
 
+test("cards and rows are keyboard-focusable", () => {
+  const win = loadDashboard();
+  const { Dashboard, document } = win;
+  Dashboard.init(document.getElementById("app"));
+  assert.equal(document.querySelector('.card[data-task-id="t1"]').getAttribute("tabindex"), "0");
+  assert.equal(document.querySelector('.row[data-task-id="s1"]').getAttribute("tabindex"), "0");
+});
+
+test("Enter key on a card opens its editor", () => {
+  const win = loadDashboard();
+  const { Dashboard, document } = win;
+  Dashboard.init(document.getElementById("app"));
+  const card = document.querySelector('.card[data-task-id="t1"]');
+  const ev = new win.KeyboardEvent("keydown", { key: "Enter", bubbles: true });
+  card.dispatchEvent(ev);
+  assert.equal(document.querySelector('.editor[data-task-id="t1"]').hidden, false);
+});
+
 test("setChecklistImportance changes weight", () => {
   const { Dashboard } = loadDashboard();
   const data = Dashboard.defaultData();
