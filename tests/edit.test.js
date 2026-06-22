@@ -17,7 +17,7 @@ test("cards and rows are keyboard-focusable", () => {
   const { Dashboard, document } = win;
   Dashboard.init(document.getElementById("app"));
   assert.equal(document.querySelector('.card[data-task-id="t1"]').getAttribute("tabindex"), "0");
-  assert.equal(document.querySelector('.row[data-task-id="s1"]').getAttribute("tabindex"), "0");
+  assert.equal(document.querySelector('.row[data-task-id="p1"]').getAttribute("tabindex"), "0");
 });
 
 test("Enter key on a card opens its editor", () => {

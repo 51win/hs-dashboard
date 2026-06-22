@@ -380,6 +380,72 @@
     padding: 8px 2px;
   }
 
+  /* Landing 'today' panel (top of board) */
+  .today-panel { margin-bottom: 28px; }
+  .today-panel h2:first-of-type { margin-top: 8px; }
+
+  /* Small tasks rendered as a flat checklist */
+  .small-list { display: flex; flex-direction: column; gap: 8px; }
+  .small-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 9px 12px;
+  }
+  .small-row .sm-done {
+    width: 16px; height: 16px; flex: 0 0 auto;
+    accent-color: var(--primary); cursor: pointer;
+  }
+  .small-row .sm-name {
+    font: inherit; font-size: var(--fs-task); color: var(--ink);
+    flex: 1 1 auto; min-width: 0;
+    border: 1px solid transparent; background: transparent;
+    border-radius: var(--radius-badge); padding: 5px 8px;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
+  }
+  .small-row .sm-name:hover { border-color: var(--border); }
+  .small-row .sm-name:focus-visible {
+    outline: 2px solid var(--focus-ring); outline-offset: 1px;
+    border-color: var(--primary-weak); background: var(--bg);
+  }
+  .small-row .sm-name.done { color: var(--ink-muted); text-decoration: line-through; }
+  .small-row .sm-due {
+    font: inherit; font-size: var(--fs-sub); color: var(--ink); flex: 0 0 auto;
+    border: 1px solid var(--border); border-radius: var(--radius-badge); padding: 5px 8px;
+  }
+  .small-row .sm-due:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+  .small-row .sm-del {
+    font: inherit; font-size: var(--fs-sub); color: var(--ink-muted); flex: 0 0 auto;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-badge); padding: 5px 10px; cursor: pointer;
+    transition: color 150ms ease-out, border-color 150ms ease-out;
+  }
+  .small-row .sm-del:hover { color: var(--risk-ink); border-color: var(--risk-ink); }
+  .small-row .sm-del:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .sm-add {
+    align-self: flex-start; font: inherit; font-size: var(--fs-sub); font-weight: 500;
+    color: var(--primary); background: transparent;
+    border: 1px dashed var(--border); border-radius: var(--radius-badge);
+    padding: 7px 12px; cursor: pointer; margin-top: 2px;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
+  }
+  .sm-add:hover { border-color: var(--primary-weak); background: var(--surface); }
+  .sm-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+  /* Editor save action */
+  .editor .editor-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+  .editor .save-btn {
+    font: inherit; font-size: var(--fs-sub); font-weight: 500; color: #fff;
+    background: var(--primary); border: 1px solid var(--primary);
+    border-radius: var(--radius-badge); padding: 7px 16px; cursor: pointer;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
+  }
+  .editor .save-btn:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
+  .editor .save-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
   /* Token charts */
   .chart {
     display: block;
@@ -496,7 +562,8 @@
       { id: "t4", groupId: "g_team", name: "과제 4", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] },
       { id: "t5", groupId: "g_team", name: "과제 5", status: "in_progress", owner: "수아", memo: "", checklist: [], issues: [], tokens: [] },
       { id: "t6", groupId: "g_team", name: "과제 6", status: "todo", owner: "미정", memo: "", checklist: [], issues: [], tokens: [] },
-      { id: "s1", groupId: "g_small", name: "데이터 마이그레이션 CSV 정리", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] },
+      { id: "s1", groupId: "g_small", name: "데이터 마이그레이션 CSV 정리", status: "todo", owner: "한승", memo: "", due: "", note: "", doneAt: "", checklist: [], issues: [], tokens: [] },
+      { id: "s2", groupId: "g_small", name: "OAuth 클라이언트 ID 발급", status: "todo", owner: "지민", memo: "", due: "", note: "", doneAt: "", checklist: [], issues: [], tokens: [] },
       { id: "p1", groupId: "g_personal", name: "주간 진행 리포트 자동화", status: "in_progress", owner: "한승", memo: "", checklist: [], issues: [], tokens: [] }
     ]
   };
@@ -563,13 +630,27 @@
   function collectToday(data, today) {
     var dueToday = [], doneToday = [], dueThisWeek = [];
     var eow = endOfWeek(today);
+    var smallGroup = groupByKind(data, "small");
+    var smallId = smallGroup ? smallGroup.id : null;
+    function consider(entry) {
+      var item = entry.item;
+      if (item.due === today && !item.done) dueToday.push(entry);
+      if (item.doneAt === today) doneToday.push(entry);
+      if (!item.done && item.due && item.due >= today && item.due <= eow) dueThisWeek.push(entry);
+    }
     (data.tasks || []).forEach(function (t) {
-      (t.checklist || []).forEach(function (item) {
-        var entry = { taskId: t.id, taskName: t.name, item: item };
-        if (item.due === today && !item.done) dueToday.push(entry);
-        if (item.doneAt === today) doneToday.push(entry);
-        if (!item.done && item.due && item.due >= today && item.due <= eow) dueThisWeek.push(entry);
-      });
+      if (smallId && t.groupId === smallId) {
+        // 작은 과제는 과제 자체가 체크 항목.
+        consider({
+          taskId: t.id,
+          taskName: "작은 과제",
+          item: { id: t.id, text: t.name, due: t.due || "", done: t.status === "done", doneAt: t.doneAt || "" }
+        });
+      } else {
+        (t.checklist || []).forEach(function (item) {
+          consider({ taskId: t.id, taskName: t.name, item: item });
+        });
+      }
     });
     return { dueToday: dueToday, doneToday: doneToday, dueThisWeek: dueThisWeek };
   }
@@ -649,22 +730,44 @@
         '<label class="tok-est"><input type="checkbox" class="tok-estimated"> 예상</label>' +
         '<button class="tok-add" type="button">추가</button>' +
       '</div><ul class="tok-list">' + tokRows + '</ul></div>' +
+      '<div class="editor-actions"><button class="save-btn" type="button">저장</button></div>' +
       "</div>";
   }
 
   function tabBarHtml() {
-    var tabs = [["board","대시보드"],["today","오늘"],["tokens","토큰"]];
+    var tabs = [["board","대시보드"],["tokens","토큰"]];
     return '<div class="tabs" role="tablist">' + tabs.map(function (p) {
       return '<button class="tab" role="tab" data-tab="' + p[0] + '"' +
         (_tab === p[0] ? ' aria-selected="true"' : ' aria-selected="false"') + ">" + p[1] + "</button>";
     }).join("") + "</div>";
   }
 
+  function smallHtml(data, group) {
+    var today = todayStr();
+    var html = '<h2>' + esc(group.name) + '</h2><div class="small-list">';
+    tasksInGroup(data, group.id).forEach(function (t) {
+      var due = t.due || "";
+      var label = ddayLabel(due, today);
+      var badge = label ? '<span class="dday' + (isUrgent(due, today) ? " urgent" : "") + '">' + label + "</span>" : "";
+      html += '<div class="small-row" data-task-id="' + t.id + '">' +
+        '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' aria-label="완료">' +
+        '<input class="sm-name' + (t.status === "done" ? " done" : "") + '" value="' + esc(t.name) + '" aria-label="작은 과제 이름">' +
+        '<input class="sm-due" type="date" value="' + esc(due) + '" aria-label="기한">' +
+        badge +
+        '<button class="sm-del" type="button" aria-label="삭제">삭제</button>' +
+        "</div>";
+    });
+    html += '<button class="sm-add" type="button">+ 작은 과제 추가</button></div>';
+    return html;
+  }
+
   function boardHtml(data) {
     var team = groupByKind(data, "team_goal");
     var small = groupByKind(data, "small");
     var personal = groupByKind(data, "personal");
-    var html = '<div class="toolbar"><button id="export-btn">내보내기</button>' +
+    // 랜딩 상단: 오늘 해야 할 것.
+    var html = '<section class="today-panel">' + todayHtml(data) + '</section>';
+    html += '<div class="toolbar"><button id="export-btn">내보내기</button>' +
       '<input id="import-input" type="file" accept="application/json"></div>';
     html += "<h2>" + esc(team.name) + " (6)</h2><div class=\"grid6\">";
     tasksInGroup(data, team.id).forEach(function (t) {
@@ -672,14 +775,14 @@
         '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + editorHtml(t) + "</div>";
     });
     html += "</div>";
-    [small, personal].forEach(function (g) {
-      if (!g) return;
-      html += "<h2>" + esc(g.name) + "</h2>";
-      tasksInGroup(data, g.id).forEach(function (t) {
+    if (small) html += smallHtml(data, small);
+    if (personal) {
+      html += "<h2>" + esc(personal.name) + "</h2>";
+      tasksInGroup(data, personal.id).forEach(function (t) {
         html += '<div class="row" tabindex="0" data-task-id="' + t.id + '">' + metaHtml(t) +
           '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + editorHtml(t) + "</div>";
       });
-    });
+    }
     return html;
   }
 
@@ -754,8 +857,7 @@
 
   function render(data, rootEl) {
     var body;
-    if (_tab === "today") body = todayHtml(data);
-    else if (_tab === "tokens") body = tokensHtml(data);
+    if (_tab === "tokens") body = tokensHtml(data);
     else body = boardHtml(data);
     rootEl.innerHTML = tabBarHtml() + body;
   }
@@ -814,6 +916,27 @@
     var t = findTask(data, taskId); if (t) t.status = status;
     return data;
   }
+  function setTaskDue(data, taskId, due) {
+    var t = findTask(data, taskId); if (t) t.due = due;
+    return data;
+  }
+  function toggleSmallDone(data, taskId) {
+    var t = findTask(data, taskId); if (!t) return data;
+    t.status = t.status === "done" ? "todo" : "done";
+    t.doneAt = t.status === "done" ? todayStr() : "";
+    return data;
+  }
+  function addSmallTask(data) {
+    var g = groupByKind(data, "small"); if (!g) return null;
+    var id = "s" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    data.tasks.push({ id: id, groupId: g.id, name: "새 과제", status: "todo", owner: "",
+      memo: "", due: "", note: "", doneAt: "", checklist: [], issues: [], tokens: [] });
+    return id;
+  }
+  function removeTask(data, taskId) {
+    data.tasks = (data.tasks || []).filter(function (t) { return t.id !== taskId; });
+    return data;
+  }
 
   var _state = null, _root = null, _bound = false, _tab = "board";
   function rerender() { render(_state, _root); }
@@ -854,7 +977,9 @@
       }
       if (e.target.closest(".editor")) {
         var taskId = closestTaskId(e.target);
-        if (e.target.classList.contains("cl-del")) {
+        if (e.target.classList.contains("save-btn")) {
+          persist(); rerender(); openEditor(taskId);
+        } else if (e.target.classList.contains("cl-del")) {
           removeChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
           persist(); rerender(); openEditor(taskId);
         } else if (e.target.classList.contains("cl-add")) {
@@ -874,6 +999,12 @@
         }
         return;
       }
+      if (e.target.classList.contains("sm-add")) {
+        addSmallTask(_state); persist(); rerender(); return;
+      }
+      if (e.target.classList.contains("sm-del")) {
+        removeTask(_state, closestTaskId(e.target)); persist(); rerender(); return;
+      }
       var card = e.target.closest(".card, .row");
       if (card) openEditor(card.getAttribute("data-task-id"));
     });
@@ -887,6 +1018,8 @@
       }
       var taskId = closestTaskId(e.target);
       if (!taskId) return;
+      if (e.target.classList.contains("sm-done")) { toggleSmallDone(_state, taskId); persist(); rerender(); return; }
+      if (e.target.classList.contains("sm-due")) { setTaskDue(_state, taskId, e.target.value); persist(); rerender(); return; }
       if (e.target.classList.contains("status")) setTaskStatus(_state, taskId, e.target.value);
       else if (e.target.classList.contains("cl-done")) toggleChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
       else if (e.target.classList.contains("cl-imp")) setChecklistImportance(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
@@ -908,6 +1041,7 @@
       if (e.target.classList.contains("owner-input")) t.owner = e.target.value;
       else if (e.target.classList.contains("memo")) t.memo = e.target.value;
       else if (e.target.classList.contains("name-input")) setTaskName(_state, taskId, e.target.value);
+      else if (e.target.classList.contains("sm-name")) setTaskName(_state, taskId, e.target.value);
       else if (e.target.classList.contains("cl-note")) setChecklistNote(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
       else if (e.target.classList.contains("cl-text")) setChecklistText(_state, taskId, e.target.getAttribute("data-item-id"), e.target.value);
       else return;
@@ -930,6 +1064,10 @@
     toggleChecklistItem: toggleChecklistItem,
     setChecklistImportance: setChecklistImportance,
     setTaskStatus: setTaskStatus,
+    setTaskDue: setTaskDue,
+    toggleSmallDone: toggleSmallDone,
+    addSmallTask: addSmallTask,
+    removeTask: removeTask,
     setTaskName: setTaskName,
     addChecklistItem: addChecklistItem,
     removeChecklistItem: removeChecklistItem,

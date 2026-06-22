@@ -118,20 +118,17 @@ test("dailyTokenSeries returns [] when undefined and sorted when set", () => {
   assert.deepEqual([...s].map(d => d.date), ["2026-06-20", "2026-06-21", "2026-06-22"]);
 });
 
-test("setTab switches rendered view", () => {
+test("landing board shows today panel + grid6; only board/tokens tabs", () => {
   const win = loadDashboard();
   const { Dashboard, document } = win;
   Dashboard.init(document.getElementById("app"));
   assert.ok(document.querySelector(".grid6"), "board shows grid6");
-
-  Dashboard.setTab("today");
-  assert.equal(document.querySelector(".grid6"), null, "today hides grid6");
-  assert.ok(document.querySelector(".today-list") || document.querySelector("h2"), "today shows sections");
   const headings = [...document.querySelectorAll("h2")].map(h => h.textContent);
-  assert.ok(headings.some(h => h.includes("오늘 할 일")));
+  assert.ok(headings.some(h => h.includes("오늘 할 일")), "board shows today section at top");
+  assert.equal(document.querySelectorAll(".tab").length, 2, "two tabs only");
 
   Dashboard.setTab("tokens");
-  assert.equal(document.querySelector(".grid6"), null);
+  assert.equal(document.querySelector(".grid6"), null, "tokens hides grid6");
   assert.ok(document.querySelector("svg") || document.querySelector(".empty"), "tokens shows svg or empty");
 });
 

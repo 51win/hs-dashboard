@@ -16,9 +16,9 @@ test("renders exactly 6 team cards in grid", () => {
   assert.equal(grid.querySelectorAll(".card[data-task-id]").length, 6);
 });
 
-test("renders small and personal task rows", () => {
+test("renders small tasks as checklist rows and personal as task rows", () => {
   const { root } = setup();
-  assert.equal(root.querySelectorAll('.row[data-task-id="s1"]').length, 1);
+  assert.equal(root.querySelectorAll('.small-row[data-task-id="s1"]').length, 1);
   assert.equal(root.querySelectorAll('.row[data-task-id="p1"]').length, 1);
 });
 
