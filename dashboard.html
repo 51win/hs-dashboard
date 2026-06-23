@@ -802,6 +802,10 @@
 
   // ---- Google Sheets (read-only) data source ----
   var SHEET_ID_KEY = "dashboard-sheet-id";
+  // 배포(공개 뷰어) 기본 시트. localStorage에 직접 지정한 값이 있으면 그게 우선.
+  var DEFAULT_SHEET_ID = "1HOGCNHqX6Ps-BlNqUXf3w9rxs4KRRY2VyOjuISBk4WE";
+  var _loadedSheetId = "";
+  function effectiveSheetId() { return getSheetId() || DEFAULT_SHEET_ID; }
   function sheetCsvUrl(sheetId, tab) {
     return "https://docs.google.com/spreadsheets/d/" + sheetId +
       "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(tab);
@@ -934,6 +938,7 @@
       var parsed = parseSheetData(texts[0], texts[1]);
       _sheetError = "";
       _lastSynced = nowTimeStr();
+      _loadedSheetId = sheetId;
       applySheetData(parsed);
       return _state;
     }).catch(function () {
@@ -1187,7 +1192,7 @@
     var sync = _lastSynced ? '<span class="sheet-banner-sync">마지막 동기화 ' + esc(_lastSynced) + "</span>" : "";
     return '<div class="sheet-banner">' +
       '<span class="sheet-banner-text">공개 구글 시트에서 읽는 중</span>' +
-      '<span class="sheet-banner-id">' + esc(truncateId(getSheetId())) + "</span>" +
+      '<span class="sheet-banner-id">' + esc(truncateId(_loadedSheetId || getSheetId())) + "</span>" +
       sync +
       '<span class="sheet-actions">' +
       '<button class="sheet-refresh" type="button">새로고침</button>' +
@@ -1316,8 +1321,9 @@
     _state = loadData();
     render(_state, _root);
     try {
-      var sid = getSheetId();
-      if (sid && typeof fetch === "function") { loadFromSheet(sid); }
+      var isJsdom = typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent || "");
+      var sid = effectiveSheetId();
+      if (sid && typeof fetch === "function" && !isJsdom) { loadFromSheet(sid); }
     } catch (e) { /* never throw on init */ }
     if (_bound) return;
     _bound = true;
