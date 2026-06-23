@@ -11,7 +11,7 @@ const LOG_PATH = path.join(DASHBOARD_DIR, ".dashboard-token-log.json");
 const SIDECAR_PATH = path.join(DASHBOARD_DIR, "dashboard-tokens.js");
 const PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 const WRITE_ENDPOINT = process.env.DASHBOARD_WRITE_ENDPOINT ||
-  "https://script.google.com/macros/s/AKfycbyvST-h8ob8zxD2dodB_cVqikQAJ0J8It9GV5kjnfXy9qfIRRf49-spKQO6kc46rGP-AA/exec";
+  "https://script.google.com/macros/s/AKfycbyTF2rx3EwXUeuF_zExpbasSwmAHD0vbmsEhqyydQI6mug24B7_IfT8-ncW4xTe9gFGHQ/exec";
 
 function localDate(d) {
   return d.getFullYear() + "-" +
