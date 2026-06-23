@@ -893,7 +893,7 @@
 
   function compareChartSvg(data) {
     var items = (data.tasks || []).map(function (t) {
-      return { name: t.name, total: taskTokenTotal(t) };
+      return { name: t.name, total: taskTokenTotal(t) + sessionTokensForTask(t.id) };
     }).filter(function (x) { return x.total > 0; });
     if (!items.length) return '<div class="empty">과제별 토큰 데이터가 없습니다.</div>';
     var max = items.reduce(function (m, x) { return Math.max(m, x.total); }, 0) || 1;
@@ -1307,6 +1307,7 @@
     isUrgent: isUrgent,
     collectToday: collectToday,
     taskTokenTotal: taskTokenTotal,
+    sessionTokensForTask: sessionTokensForTask,
     dailyTokenSeries: dailyTokenSeries,
     setTab: setTab,
     init: init,
