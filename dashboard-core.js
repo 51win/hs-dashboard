@@ -23,14 +23,11 @@
   // 사이트 모드: "view"(공유·읽기 전용) | "edit"(개인·편집). 기본 edit(테스트 호환).
   var MODE = (typeof global !== "undefined" && global.DASHBOARD_MODE) ? String(global.DASHBOARD_MODE) : "edit";
   var _readonly = false, _sheetError = "", _lastSynced = "", _tokenInterval = null, _pollingEnabled = false;
-  // 시트 쓰기 엔드포인트(Apps Script 웹앱). 비밀번호는 편집 사이트 localStorage에 보관(서버가 검증).
-  var WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbxLe29K4JPLcPHXPQkCANWGCPo9cj41RSMauJllC48c0AhB1AMlgcUgC4iFicNOiMUp1A/exec";
-  var ADMIN_PW_KEY = "dashboard-admin-password";
-  var _adminPassword = "", _saveMsg = "", _pushTimer = null;
+  // 시트 쓰기 엔드포인트(Apps Script 웹앱). 공개 노출을 막기 위해 로컬 edit.html에서만 주입한다.
+  // (공유 index.html에는 주입하지 않으므로 배포 코드에 주소가 남지 않음.)
+  var WRITE_ENDPOINT = (typeof global !== "undefined" && global.DASHBOARD_WRITE_ENDPOINT) ? String(global.DASHBOARD_WRITE_ENDPOINT) : "";
+  var _saveMsg = "", _pushTimer = null;
   function canEdit() { return MODE === "edit"; }
-  function getStoredPw() { try { return global.localStorage.getItem(ADMIN_PW_KEY) || ""; } catch (e) { return ""; } }
-  function setStoredPw(pw) { try { global.localStorage.setItem(ADMIN_PW_KEY, String(pw)); } catch (e) {} }
-  function clearStoredPw() { try { global.localStorage.removeItem(ADMIN_PW_KEY); } catch (e) {} }
 
   function defaultData() { return JSON.parse(JSON.stringify(SEED)); }
   function tasksInGroup(data, groupId) {
@@ -325,11 +322,9 @@
   }
   // JSONP로 Apps Script doGet을 호출 → CORS 우회 + 서버 응답을 직접 읽어 정확한 피드백.
   function saveToSheet() {
-    var pw = _adminPassword || getStoredPw();
-    if (!pw) { _saveMsg = "게시하려면 비밀번호가 필요해요. ‘비밀번호 설정’을 눌러주세요."; rerender(); return Promise.resolve(); }
-    _adminPassword = pw;
+    if (!WRITE_ENDPOINT) { _saveMsg = "게시 주소가 설정되지 않았어요(edit.html의 DASHBOARD_WRITE_ENDPOINT 확인)."; rerender(); return Promise.resolve(); }
     var payload = dataToSheetRows(_state);
-    var data = { password: pw, tasks: payload.tasks, checklist: payload.checklist };
+    var data = { tasks: payload.tasks, checklist: payload.checklist };
     _saveMsg = "게시 중…"; rerender();
     if (typeof document === "undefined" || !document.head) {
       _saveMsg = "이 환경에서는 게시할 수 없어요."; rerender();
@@ -355,8 +350,7 @@
           rerender();
         } else {
           var err = res && res.error ? res.error : "알 수 없는 오류";
-          if (err === "unauthorized") { clearStoredPw(); _adminPassword = ""; _saveMsg = "게시 실패: 비밀번호가 틀렸습니다. 다시 설정하세요."; }
-          else { _saveMsg = "게시 실패: " + err; }
+          _saveMsg = "게시 실패: " + err;
           rerender();
         }
         resolve();
@@ -395,15 +389,6 @@
       _saveMsg = "불러오기 실패(네트워크/공개 설정 확인).";
       rerender(); return null;
     });
-  }
-
-  function setPublishPassword(pw) {
-    if (pw == null) return getStoredPw();
-    var v = String(pw).trim();
-    if (v) { setStoredPw(v); _adminPassword = v; _saveMsg = "비밀번호가 저장됐어요."; }
-    else { clearStoredPw(); _adminPassword = ""; _saveMsg = "비밀번호를 지웠어요."; }
-    if (_root) rerender();
-    return v;
   }
 
   function statusLabel(s) { return s === "done" ? "완료" : s === "in_progress" ? "진행" : "예정"; }
@@ -660,18 +645,13 @@
   }
   // 편집(개인) 사이트 배너: 게시 상태 + 게시/불러오기/비밀번호.
   function editBannerHtml() {
-    var hasPw = !!getStoredPw();
     var msg = _saveMsg ? '<span class="save-msg">' + esc(_saveMsg) + "</span>" : "";
-    var pwBtn = hasPw
-      ? '<button class="pw-set" type="button">비밀번호 변경</button>'
-      : '<button class="pw-set" type="button">비밀번호 설정</button>';
     return '<div class="sheet-banner admin">' +
       '<span class="sheet-banner-text">로컬 편집 중 · 시트에 자동 게시</span>' +
       msg +
       '<span class="sheet-actions">' +
       '<button class="admin-save" type="button">지금 게시</button>' +
       '<button class="sheet-pull" type="button">시트에서 불러오기</button>' +
-      pwBtn +
       "</span></div>";
   }
   function localActionsHtml() {
@@ -821,11 +801,6 @@
         pullFromSheet();
         return;
       }
-      if (e.target.classList && e.target.classList.contains("pw-set")) {
-        var npw = global.prompt ? global.prompt("게시용 비밀번호를 입력하세요(서버가 검증).", getStoredPw()) : "";
-        if (npw != null) setPublishPassword(npw);
-        return;
-      }
       if (e.target.classList && e.target.classList.contains("admin-save")) {
         if (_pushTimer) { try { clearTimeout(_pushTimer); } catch (er) {} _pushTimer = null; }
         saveToSheet();
@@ -842,7 +817,7 @@
       if (e.target.closest(".editor")) {
         var taskId = closestTaskId(e.target);
         if (e.target.classList.contains("save-btn")) {
-          persist(); rerender(); openEditor(taskId);
+          persist(); rerender(); /* 저장 후 해당 편집 칸을 닫음(기본 hidden 유지) */
         } else if (e.target.classList.contains("cl-del")) {
           removeChecklistItem(_state, taskId, e.target.getAttribute("data-item-id"));
           persist(); rerender(); openEditor(taskId);
@@ -960,7 +935,6 @@
     saveToSheet: saveToSheet,
     schedulePush: schedulePush,
     pullFromSheet: pullFromSheet,
-    setPublishPassword: setPublishPassword,
     mode: function () { return MODE; }
   };
   global.Dashboard = Dashboard;

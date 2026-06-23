@@ -30,6 +30,18 @@ test("Enter key on a card opens its editor", () => {
   assert.equal(document.querySelector('.editor[data-task-id="t1"]').hidden, false);
 });
 
+test("저장 버튼을 누르면 해당 편집 칸이 닫힌다", () => {
+  const win = loadDashboard();
+  const { Dashboard, document } = win;
+  Dashboard.init(document.getElementById("app"));
+  const card = document.querySelector('.card[data-task-id="t1"]');
+  card.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  assert.equal(document.querySelector('.editor[data-task-id="t1"]').hidden, false, "열림");
+  const save = document.querySelector('.editor[data-task-id="t1"] .save-btn');
+  save.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
+  assert.equal(document.querySelector('.editor[data-task-id="t1"]').hidden, true, "저장 후 닫힘");
+});
+
 test("setChecklistImportance changes weight", () => {
   const { Dashboard } = loadDashboard();
   const data = Dashboard.defaultData();

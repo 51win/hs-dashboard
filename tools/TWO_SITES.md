@@ -9,15 +9,15 @@
   편집 코드가 아예 없어 열람자는 수정할 수 없음. GitHub Pages에 올려 팀에 공유.
 - `edit.html` — 편집(개인) 사이트. **내 컴퓨터에서만** 엽니다(파일 더블클릭). 인라인 편집기로
   수정하면 localStorage에 즉시 저장되고, 2.5초 뒤 구글 시트에 자동 게시됩니다.
-  `.gitignore`에 들어 있어 공개 URL이 생기지 않습니다.
+  `.gitignore`에 들어 있어 공개 URL이 생기지 않습니다. 시트 쓰기 주소
+  (`DASHBOARD_WRITE_ENDPOINT`)도 이 파일에만 있어 공유 사이트엔 노출되지 않습니다.
 - `dashboard.html` — 예전 주소 호환용. 열면 `index.html`로 자동 이동.
 - `dashboard-core.js` — 두 사이트가 공유하는 공통 로직(한 곳만 고치면 둘 다 반영).
 
 ## 평소 사용법
 
 1. 수정: 내 컴퓨터에서 `edit.html`을 열고 편집 → 자동으로 시트에 게시됨(상단 배너에 상태 표시).
-   - 처음 한 번 "비밀번호 설정"을 눌러 게시 비밀번호를 입력(서버가 검증, 로컬에 저장됨).
-   - "지금 게시"로 즉시 올릴 수도 있음.
+   비밀번호 없이 바로 게시됩니다. "지금 게시"로 즉시 올릴 수도 있음.
 2. 공유: 팀은 GitHub Pages의 `index.html` 주소를 봄 → "새로고침"으로 최신 내용 확인.
 
 ## 동기화 원리
@@ -30,5 +30,7 @@
 
 ## 참고
 
-- 비밀번호/쓰기 검증은 서버(Apps Script)에서만 — 자세한 설정은 `ADMIN_PASSWORD_APPSCRIPT.md`.
-- `ADMIN_OAUTH_SETUP.md`의 OAuth 방식은 더 이상 쓰지 않습니다(비밀번호+서버 검증으로 단순화).
+- 쓰기용 Apps Script(비밀번호 없는 버전) 설정·재배포: `APPSCRIPT_NO_PASSWORD.md`.
+- 보호는 "쓰기 주소를 비밀로 유지"에 의존합니다 → `edit.html`을 공유/배포하지 마세요.
+- 비밀번호 버전으로 되돌리려면 `ADMIN_PASSWORD_APPSCRIPT.md` 참고.
+- `ADMIN_OAUTH_SETUP.md`의 OAuth 방식은 더 이상 쓰지 않습니다.

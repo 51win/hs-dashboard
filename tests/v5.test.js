@@ -58,7 +58,7 @@ test("view 모드는 편집 UI가 없고 읽기 배너+새로고침만 보인다
   assert.ok(root.querySelector(".sheet-refresh"), "새로고침 버튼");
 });
 
-test("edit 모드는 편집 UI + 게시/불러오기 버튼이 보인다", () => {
+test("edit 모드는 편집 UI + 게시/불러오기 버튼이 보이고 비밀번호 버튼은 없다", () => {
   const win = loadDashboard("edit");
   const { Dashboard, document } = win;
   Dashboard.init(document.getElementById("app"));
@@ -68,22 +68,16 @@ test("edit 모드는 편집 UI + 게시/불러오기 버튼이 보인다", () =>
   assert.ok(root.querySelector(".sheet-pull"), "시트에서 불러오기 버튼");
   assert.ok(root.querySelector(".save-btn"), "편집 저장 버튼");
   assert.ok(root.querySelector(".sm-add"), "작은 과제 추가 버튼");
+  assert.equal(root.querySelector(".pw-set"), null, "비밀번호 버튼 없음");
   assert.equal(Dashboard.mode(), "edit");
 });
 
-test("edit 모드: 비밀번호 없으면 게시가 안내 메시지를 보인다", () => {
+test("edit 모드: 게시 주소가 없으면 안내 메시지를 보인다(공유 코어 단독)", () => {
   const win = loadDashboard("edit");
   const { Dashboard, document } = win;
   Dashboard.init(document.getElementById("app"));
   return Dashboard.saveToSheet().then(() => {
     const banner = document.getElementById("app").querySelector(".save-msg");
-    assert.ok(banner && /비밀번호/.test(banner.textContent), "비밀번호 안내");
+    assert.ok(banner && /게시 주소/.test(banner.textContent), "게시 주소 안내");
   });
-});
-
-test("edit 모드: 비밀번호 설정 후 localStorage에 저장된다", () => {
-  const win = loadDashboard("edit");
-  const { Dashboard } = win;
-  Dashboard.setPublishPassword("secret-123");
-  assert.equal(win.localStorage.getItem("dashboard-admin-password"), "secret-123");
 });
