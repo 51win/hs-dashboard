@@ -17,18 +17,20 @@
 ## 한승이 할 일 (5분, Google Cloud 불필요)
 
 1. 데이터 구글 시트 열기 → 메뉴 **확장 프로그램 → Apps Script**.
-2. 아래 코드를 붙여넣고 저장(`Code.gs`):
+2. 아래 코드를 **전부 지우고** 붙여넣은 뒤 저장(`Code.gs`). 대시보드는 JSONP(GET) 로
+   호출하므로 `doGet`을 씁니다(브라우저 CORS 우회 + 응답을 읽어 정확한 오류 표시):
 
 ```javascript
 // 시트에 쓰기 + 비밀번호 검증. 읽기는 대시보드가 gviz로 직접 함(여기선 쓰기만).
 const SHEET_ID = '1HOGCNHqX6Ps-BlNqUXf3w9rxs4KRRY2VyOjuISBk4WE';
 
-function doPost(e) {
+function doGet(e) {
+  const cb = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : 'cb';
   try {
-    const body = JSON.parse(e.postData.contents || '{}');
     const expected = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
+    const body = JSON.parse((e && e.parameter && e.parameter.payload) || '{}');
     if (!expected || body.password !== expected) {
-      return json({ ok: false, error: 'unauthorized' });
+      return jsonp(cb, { ok: false, error: 'unauthorized' });
     }
     const ss = SpreadsheetApp.openById(SHEET_ID);
     writeTab(ss, 'Tasks',
@@ -37,9 +39,9 @@ function doPost(e) {
     writeTab(ss, 'Checklist',
       ['taskId','id','text','note','importance','done','due','doneAt'],
       body.checklist || []);
-    return json({ ok: true });
+    return jsonp(cb, { ok: true, tasks: (body.tasks||[]).length, checklist: (body.checklist||[]).length });
   } catch (err) {
-    return json({ ok: false, error: String(err) });
+    return jsonp(cb, { ok: false, error: String(err) });
   }
 }
 
@@ -52,19 +54,35 @@ function writeTab(ss, name, header, rows) {
   sh.getRange(1, 1, out.length, header.length).setValues(out);
 }
 
-function json(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+function jsonp(cb, obj) {
+  return ContentService.createTextOutput(cb + '(' + JSON.stringify(obj) + ')')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 ```
+
+> 빠른 점검: 저장 후 Apps Script 편집기에서 함수 `doGet`을 한 번 실행해 권한(시트 접근)을
+> 승인해 두면 첫 호출이 매끄럽습니다.
 
 3. 좌측 **프로젝트 설정(톱니) → 스크립트 속성 → 속성 추가**:
    - 이름 `ADMIN_PASSWORD`, 값 = 원하는 **고유 비밀번호**(길고 추측 어렵게).
 4. **배포 → 새 배포 → 유형: 웹 앱**
    - 실행 주체(Execute as) = **나(Me)**
-   - 액세스 권한(Who has access) = **모든 사용자(Anyone)**
+   - 액세스 권한(Who has access) = **모든 사용자(Anyone)** ← 익명 접근 허용이 핵심.
    - 배포 → 권한 승인(본인 계정) → **웹 앱 URL** 복사(`https://script.google.com/macros/s/.../exec`).
+
+   ⚠️ **코드를 바꾼 뒤에는 반드시 다시 배포해야 반영됩니다.** Apps Script는 이전 배포 버전을
+   계속 제공하므로, 위 코드로 교체했다면 **배포 → 배포 관리 → (연필) 편집 → 버전: "새 버전" →
+   배포**, 또는 "새 배포"를 다시 하세요. (URL이 같은 `/.../exec`로 유지되면 그대로 쓰면 됨.)
 5. 그 **웹 앱 URL**을 알려주세요. (비밀번호는 알려줄 필요 없음 — 서버에만 있으면 됨.)
+
+## 저장이 시트에 반영 안 될 때 체크리스트
+
+- 대시보드를 **https(GitHub Pages)** 에서 열고 있나요? `file://` 로컬에서는 동작하지 않습니다.
+- 코드 교체 후 **새 버전으로 다시 배포**했나요? (가장 흔한 원인)
+- 웹앱 액세스 권한이 **모든 사용자(Anyone)** 인가요?
+- 스크립트 속성 `ADMIN_PASSWORD` 값과 대시보드에서 입력한 비밀번호가 **정확히** 같나요?
+  (이제 비밀번호가 틀리면 대시보드가 "비밀번호가 틀렸습니다"라고 표시합니다.)
+- `SHEET_ID`가 우리 시트와 같나요?
 
 ## 내가 구현할 것 (URL 받으면)
 
