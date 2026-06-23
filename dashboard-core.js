@@ -26,6 +26,9 @@
   // 시트 쓰기 엔드포인트(Apps Script 웹앱). 공개 노출을 막기 위해 로컬 edit.html에서만 주입한다.
   // (공유 index.html에는 주입하지 않으므로 배포 코드에 주소가 남지 않음.)
   var WRITE_ENDPOINT = (typeof global !== "undefined" && global.DASHBOARD_WRITE_ENDPOINT) ? String(global.DASHBOARD_WRITE_ENDPOINT) : "";
+  var READ_ENDPOINT = (typeof global !== "undefined" && global.DASHBOARD_READ_ENDPOINT)
+    ? String(global.DASHBOARD_READ_ENDPOINT)
+    : WRITE_ENDPOINT;
   var _saveMsg = "", _pushTimer = null;
   function canEdit() { return MODE === "edit"; }
 
@@ -120,12 +123,44 @@
   function taskTokenTotal(task) {
     return (task.tokens || []).reduce(function (sum, e) { return sum + (Number(e.tokens) || 0); }, 0);
   }
+  // _tokenSessions: Sheets에서 로드된 세션 배열 캐시
+  var _tokenSessions = null;
+  var _tokenSessionsLoading = false;
+
+  function loadTokenSessionsFromSheet(onDone) {
+    if (!READ_ENDPOINT) { onDone([]); return; }
+    if (typeof document === "undefined" || !document.createElement || !document.head) { onDone([]); return; }
+    _tokenSessionsLoading = true;
+    var cb = "_tokCb" + Date.now();
+    var s = document.createElement("script");
+    s.src = READ_ENDPOINT + "?action=readTokenSessions&callback=" + encodeURIComponent(cb);
+    global[cb] = function (res) {
+      delete global[cb];
+      document.head.removeChild(s);
+      _tokenSessionsLoading = false;
+      _tokenSessions = (res && res.ok && Array.isArray(res.sessions)) ? res.sessions : [];
+      onDone(_tokenSessions);
+    };
+    s.onerror = function () {
+      delete global[cb];
+      try { document.head.removeChild(s); } catch (_) {}
+      _tokenSessionsLoading = false;
+      _tokenSessions = [];
+      onDone([]);
+    };
+    document.head.appendChild(s);
+  }
+
   function dailyTokenSeries() {
-    var dt = global.DASHBOARD_TOKENS;
-    if (!dt || !Array.isArray(dt.daily)) return [];
-    return dt.daily
-      .filter(function (d) { return d.date >= START_DATE; })
-      .slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var sessions = _tokenSessions || [];
+    var byDate = {};
+    sessions.forEach(function (s) {
+      if (!s.date || s.date < START_DATE) return;
+      byDate[s.date] = (byDate[s.date] || 0) + (Number(s.tokens) || 0);
+    });
+    return Object.keys(byDate).sort().map(function (date) {
+      return { date: date, tokens: byDate[date] };
+    });
   }
 
   // 토큰 메모: sidecar(자동 생성)와 별개로 localStorage에 저장해 statusline 재생성 시에도 유지.
@@ -170,16 +205,14 @@
 
   // 시간대별 집계 (sessions의 time 필드 → 0~23시)
   function hourlyBuckets() {
-    var dt = global.DASHBOARD_TOKENS;
+    var sessions = _tokenSessions || [];
     var buckets = {};
-    if (dt && Array.isArray(dt.sessions)) {
-      dt.sessions.forEach(function (s) {
-        if (!s.time || s.date < START_DATE) return;
-        var h = parseInt(s.time.split(":")[0], 10);
-        if (isNaN(h) || h < 0 || h > 23) return;
-        buckets[h] = (buckets[h] || 0) + (s.tokens || 0);
-      });
-    }
+    sessions.forEach(function (s) {
+      if (!s.time || s.date < START_DATE) return;
+      var h = parseInt(s.time.split(":")[0], 10);
+      if (isNaN(h) || h < 0 || h > 23) return;
+      buckets[h] = (buckets[h] || 0) + (Number(s.tokens) || 0);
+    });
     return buckets;
   }
 
@@ -723,14 +756,13 @@
 
   // 세션별 목록 (날짜 + 시작 시각 + 토큰, cost 없음)
   function sessionsHtml() {
-    var dt = global.DASHBOARD_TOKENS;
-    if (!dt || !Array.isArray(dt.sessions) || !dt.sessions.length) {
-      return '<div class="empty">세션 기록이 없습니다.</div>';
-    }
-    var valid = dt.sessions.filter(function (s) { return s.date >= START_DATE; });
+    if (_tokenSessionsLoading) return '<div class="empty">불러오는 중...</div>';
+    var sessions = _tokenSessions;
+    if (!sessions) return '<div class="empty">불러오는 중...</div>';
+    var valid = sessions.filter(function (s) { return s.date >= START_DATE; });
     if (!valid.length) return '<div class="empty">세션 기록이 없습니다.</div>';
     var rows = valid.slice(0, 100).map(function (s) {
-      var tk = fmtTok(s.tokens || 0);
+      var tk = fmtTok(Number(s.tokens) || 0);
       var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
       return '<div class="tok-day-row">' +
         '<span class="tok-day-date">' + when + "</span>" +
@@ -751,6 +783,11 @@
   }
 
   function tokensHtml(data) {
+    if (_tokenSessions === null && !_tokenSessionsLoading) {
+      // 최초 진입: Sheets에서 로드 후 재렌더
+      loadTokenSessionsFromSheet(function () { if (_tab === "tokens") rerender(); });
+      return '<div class="empty">불러오는 중...</div>';
+    }
     var series = mergedDailySeries();
     return '<button class="token-refresh" type="button">새로고침</button>' +
       weeklyHtml(series) +
@@ -761,21 +798,9 @@
       "<h2>과제별 비교</h2>" + compareChartSvg(data);
   }
 
-  function reloadTokensSidecar(onDone) {
-    if (typeof document === "undefined" || !document.createElement || !document.head) {
-      if (onDone) onDone();
-      return;
-    }
-    var s = document.createElement("script");
-    s.src = "dashboard-tokens.js?t=" + Date.now();
-    s.onload = function () { if (onDone) onDone(); };
-    s.onerror = function () { if (onDone) onDone(); };
-    document.head.appendChild(s);
-  }
   function refreshTokensTab() {
-    reloadTokensSidecar(function () {
-      if (_tab === "tokens") rerender();
-    });
+    _tokenSessions = null;
+    if (_tab === "tokens") rerender();
   }
   function setupTokenPolling() {
     if (typeof setInterval !== "function") return;
@@ -783,7 +808,8 @@
       if (_tokenInterval == null) {
         _tokenInterval = setInterval(function () {
           if (_tab !== "tokens") return;
-          reloadTokensSidecar(function () { if (_tab === "tokens") rerender(); });
+          _tokenSessions = null;
+          if (_tab === "tokens") rerender();
         }, 30000);
         if (_tokenInterval && typeof _tokenInterval.unref === "function") _tokenInterval.unref();
       }
