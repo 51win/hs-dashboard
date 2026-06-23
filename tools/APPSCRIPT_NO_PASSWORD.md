@@ -133,7 +133,7 @@ function readTokenSessions(cb) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sh = ss.getSheetByName('Sessions');
   if (!sh || sh.getLastRow() < 2) return jsonp(cb, { ok: true, sessions: [] });
-  const lastCol = Math.max(sh.getLastColumn(), 5);
+  const lastCol = Math.max(sh.getLastColumn(), 6);
   const rows = sh.getRange(2, 1, sh.getLastRow() - 1, lastCol).getValues();
   const sessions = rows
     .filter(r => r[0])
