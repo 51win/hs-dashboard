@@ -640,6 +640,27 @@
   .sheet-disconnect:hover { color: var(--risk-ink); border-color: var(--risk-ink); background: var(--surface); }
   .token-refresh { margin-bottom: 10px; }
 
+  /* Admin (password) mode */
+  .admin-login, .admin-logout {
+    font: inherit; font-size: var(--fs-sub); font-weight: 500;
+    color: var(--primary); background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-badge);
+    padding: 7px 14px; cursor: pointer;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
+  }
+  .admin-login:hover, .admin-logout:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  .admin-login:focus-visible, .admin-logout:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .admin-save {
+    font: inherit; font-size: var(--fs-sub); font-weight: 500; color: #fff;
+    background: var(--primary); border: 1px solid var(--primary);
+    border-radius: var(--radius-badge); padding: 7px 14px; cursor: pointer;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
+  }
+  .admin-save:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
+  .admin-save:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .sheet-banner.admin { background: var(--status-progress-bg); border-color: var(--primary-weak); }
+  .sheet-banner .save-msg { font-size: var(--fs-sub); color: var(--ink-muted); margin-left: 4px; }
+
   /* Read-only board: disabled small-row checkbox + plain display */
   .small-row .sm-done:disabled { cursor: default; opacity: 0.8; }
   .small-row .sm-name-ro {
@@ -684,6 +705,10 @@
   };
 
   var _readonly = false, _sheetError = "", _lastSynced = "", _tokenInterval = null, _pollingEnabled = false;
+  // 관리자(비밀번호) 모드 + 시트 쓰기 엔드포인트(Apps Script 웹앱).
+  var WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyjznY7g-y5hvodw6vjvoxYnz93vhNFjdinkJ4oeS28try5eTNAH01shFhyNulnYzTXgg/exec";
+  var _admin = false, _adminPassword = "", _saveMsg = "";
+  function canEdit() { return _admin || !_readonly; }
 
   function defaultData() { return JSON.parse(JSON.stringify(SEED)); }
   function tasksInGroup(data, groupId) {
@@ -950,6 +975,55 @@
     });
   }
 
+  function dataToSheetRows(data) {
+    var kindOf = {};
+    (data.groups || []).forEach(function (g) { kindOf[g.id] = g.kind; });
+    var tasks = (data.tasks || []).map(function (t) {
+      return { id: t.id, group: kindOf[t.groupId] || "team_goal", name: t.name || "",
+        status: t.status || "todo", owner: t.owner || "", due: t.due || "",
+        doneAt: t.doneAt || "", memo: t.memo || "" };
+    });
+    var checklist = [];
+    (data.tasks || []).forEach(function (t) {
+      (t.checklist || []).forEach(function (c) {
+        checklist.push({ taskId: t.id, id: c.id, text: c.text || "", note: c.note || "",
+          importance: c.importance || "mid", done: c.done ? "TRUE" : "FALSE",
+          due: c.due || "", doneAt: c.doneAt || "" });
+      });
+    });
+    return { tasks: tasks, checklist: checklist };
+  }
+  function saveToSheet() {
+    var payload = dataToSheetRows(_state);
+    var bodyStr = JSON.stringify({ password: _adminPassword, tasks: payload.tasks, checklist: payload.checklist });
+    _saveMsg = "저장 중…"; rerender();
+    if (typeof fetch !== "function") { _saveMsg = "이 환경에서는 저장할 수 없어요(https 필요)."; rerender(); return Promise.resolve(); }
+    return fetch(WRITE_ENDPOINT, { method: "POST", body: bodyStr })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.ok) { _saveMsg = "시트에 저장됨 ✓ " + nowTimeStr(); }
+        else { _saveMsg = "저장 실패: 비밀번호를 확인하세요."; }
+        rerender();
+      })
+      .catch(function () {
+        // Apps Script는 보통 응답 읽기가 CORS로 막혀 fetch가 실패함 → no-cors로 전송 후 시트에서 재동기화로 확인.
+        return fetch(WRITE_ENDPOINT, { method: "POST", mode: "no-cors", body: bodyStr })
+          .then(function () {
+            _saveMsg = "저장 요청 전송됨 — 시트 반영 확인 중…"; rerender();
+            return new Promise(function (r) { setTimeout(r, 1500); });
+          })
+          .then(function () { return loadFromSheet(_loadedSheetId || effectiveSheetId()); })
+          .then(function () { _saveMsg = "시트와 동기화됨 ✓ " + nowTimeStr() + " (비밀번호가 틀렸다면 변경분이 반영되지 않습니다)"; rerender(); })
+          .catch(function () { _saveMsg = "저장 요청을 보냈지만 확인하지 못했어요. 새로고침으로 확인하세요."; rerender(); });
+      });
+  }
+
+  function loginAdmin(pw) {
+    if (pw) { _adminPassword = String(pw); _admin = true; _saveMsg = ""; if (_root) rerender(); }
+    return _admin;
+  }
+  function logoutAdmin() { _admin = false; _adminPassword = ""; _saveMsg = ""; }
+
   function statusLabel(s) { return s === "done" ? "완료" : s === "in_progress" ? "진행" : "예정"; }
   function importanceLabel(i) { return i === "high" ? "상" : i === "low" ? "하" : "중"; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
@@ -1025,7 +1099,7 @@
       var label = ddayLabel(due, today);
       var badge = label ? '<span class="dday' + (isUrgent(due, today) ? " urgent" : "") + '">' + label + "</span>" : "";
       var doneCls = t.status === "done" ? " done" : "";
-      if (_readonly) {
+      if (!canEdit()) {
         html += '<div class="small-row" data-task-id="' + t.id + '">' +
           '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' disabled aria-label="완료">' +
           '<span class="sm-name-ro' + doneCls + '">' + esc(t.name) + "</span>" +
@@ -1042,7 +1116,7 @@
           "</div>";
       }
     });
-    if (!_readonly) html += '<button class="sm-add" type="button">+ 작은 과제 추가</button>';
+    if (canEdit()) html += '<button class="sm-add" type="button">+ 작은 과제 추가</button>';
     html += '</div>';
     return html;
   }
@@ -1056,7 +1130,7 @@
     var teamCount = tasksInGroup(data, team.id).length;
     html += "<h2>" + esc(team.name) + " (" + teamCount + ")</h2><div class=\"grid6\">";
     tasksInGroup(data, team.id).forEach(function (t) {
-      if (_readonly) {
+      if (!canEdit()) {
         html += '<div class="card" data-task-id="' + t.id + '"><div class="t-name">' + esc(t.name) +
           '</div><div class="meta">' + metaHtml(t) + "</div>" + barHtml(t) + "</div>";
       } else {
@@ -1069,7 +1143,7 @@
     if (personal) {
       html += "<h2>" + esc(personal.name) + "</h2>";
       tasksInGroup(data, personal.id).forEach(function (t) {
-        if (_readonly) {
+        if (!canEdit()) {
           html += '<div class="row" data-task-id="' + t.id + '">' + metaHtml(t) +
             '<span class="r-name">' + esc(t.name) + "</span>" + barHtml(t) + "</div>";
         } else {
@@ -1190,12 +1264,19 @@
   }
   function sheetBannerHtml() {
     var sync = _lastSynced ? '<span class="sheet-banner-sync">마지막 동기화 ' + esc(_lastSynced) + "</span>" : "";
-    return '<div class="sheet-banner">' +
-      '<span class="sheet-banner-text">공개 구글 시트에서 읽는 중</span>' +
+    var label = _admin ? "관리자 모드 · 시트 편집 중" : "공개 구글 시트에서 읽는 중";
+    var adminActions = _admin
+      ? '<button class="admin-save" type="button">시트에 저장</button>' +
+        '<button class="admin-logout" type="button">관리자 해제</button>'
+      : '<button class="admin-login" type="button">관리자</button>';
+    var msg = _saveMsg ? '<span class="save-msg">' + esc(_saveMsg) + "</span>" : "";
+    return '<div class="sheet-banner' + (_admin ? " admin" : "") + '">' +
+      '<span class="sheet-banner-text">' + label + "</span>" +
       '<span class="sheet-banner-id">' + esc(truncateId(_loadedSheetId || getSheetId())) + "</span>" +
-      sync +
+      sync + msg +
       '<span class="sheet-actions">' +
       '<button class="sheet-refresh" type="button">새로고침</button>' +
+      adminActions +
       '<button class="sheet-disconnect" type="button">연결 해제</button>' +
       "</span></div>";
   }
@@ -1359,6 +1440,20 @@
         rerender();
         return;
       }
+      if (e.target.classList && e.target.classList.contains("admin-login")) {
+        var pw = global.prompt ? global.prompt("관리자 비밀번호를 입력하세요") : "";
+        loginAdmin(pw);
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("admin-logout")) {
+        _admin = false; _adminPassword = ""; _saveMsg = "";
+        loadFromSheet(_loadedSheetId || effectiveSheetId());
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("admin-save")) {
+        saveToSheet();
+        return;
+      }
       if (e.target.id === "export-btn") {
         var blob = new global.Blob([exportData(_state)], { type: "application/json" });
         var url = global.URL.createObjectURL(blob);
@@ -1483,7 +1578,11 @@
     clearSheetId: clearSheetId,
     applySheetData: applySheetData,
     loadFromSheet: loadFromSheet,
-    refreshTokensTab: refreshTokensTab
+    refreshTokensTab: refreshTokensTab,
+    dataToSheetRows: dataToSheetRows,
+    saveToSheet: saveToSheet,
+    loginAdmin: loginAdmin,
+    logoutAdmin: logoutAdmin
   };
   global.Dashboard = Dashboard;
 
