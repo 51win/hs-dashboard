@@ -20,6 +20,17 @@ function doGet(e) {
   try {
     const action = e && e.parameter && e.parameter.action;
 
+    if (action === 'readTokenMemos') {
+      return readTokenMemos(cb);
+    }
+
+    if (action === 'upsertTokenMemo') {
+      const raw = e && e.parameter && e.parameter.payload;
+      if (!raw) return jsonp(cb, { ok: false, error: 'no payload' });
+      const body = JSON.parse(raw);
+      return upsertTokenMemo(cb, body);
+    }
+
     if (action === 'readTokenSessions') {
       return readTokenSessions(cb);
     }
@@ -80,36 +91,83 @@ function fmtTime(v) {
   return String(v);
 }
 
+function readTokenMemos(cb) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sh = ss.getSheetByName('TokenMemos');
+  if (!sh || sh.getLastRow() < 2) return jsonp(cb, { ok: true, memos: {} });
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  const memos = {};
+  rows.filter(r => r[0]).forEach(r => { memos[String(r[0])] = String(r[1]); });
+  return jsonp(cb, { ok: true, memos });
+}
+
+function upsertTokenMemo(cb, body) {
+  const { date, memo } = body;
+  if (!date) return jsonp(cb, { ok: false, error: 'missing date' });
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sh = ss.getSheetByName('TokenMemos') || ss.insertSheet('TokenMemos');
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['date', 'memo']);
+    sh.getRange(1, 1, sh.getMaxRows(), 1).setNumberFormat('@');
+  }
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(date)) {
+      if (memo) {
+        sh.getRange(i + 1, 2).setValue(memo);
+      } else {
+        sh.deleteRow(i + 1);
+      }
+      return jsonp(cb, { ok: true, action: 'updated' });
+    }
+  }
+  if (memo) {
+    const newRowIdx = sh.getLastRow() + 1;
+    sh.appendRow([date, memo]);
+    sh.getRange(newRowIdx, 1, 1, 1).setNumberFormat('@');
+  }
+  return jsonp(cb, { ok: true, action: 'inserted' });
+}
+
 function readTokenSessions(cb) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sh = ss.getSheetByName('Sessions');
   if (!sh || sh.getLastRow() < 2) return jsonp(cb, { ok: true, sessions: [] });
-  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  const lastCol = Math.max(sh.getLastColumn(), 5);
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, lastCol).getValues();
   const sessions = rows
     .filter(r => r[0])
-    .map(r => ({ sessionId: String(r[0]), date: fmtDate(r[1]), time: fmtTime(r[2]), tokens: Number(r[3]) || 0 }));
+    .map(r => ({
+      sessionId: String(r[0]),
+      date: fmtDate(r[1]),
+      time: fmtTime(r[2]),
+      tokens: Number(r[3]) || 0,
+      taskId: String(r[4] || ''),
+      memo: String(r[5] || '')
+    }));
   return jsonp(cb, { ok: true, sessions });
 }
 
 function upsertTokenSession(cb, body) {
-  const { sessionId, date, time, tokens } = body;
+  const { sessionId, date, time, tokens, taskId, memo } = body;
   if (!sessionId) return jsonp(cb, { ok: false, error: 'missing sessionId' });
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sh = ss.getSheetByName('Sessions') || ss.insertSheet('Sessions');
   if (sh.getLastRow() === 0) {
-    sh.appendRow(['sessionId', 'date', 'time', 'tokens']);
-    // date·time 컬럼을 텍스트 포맷으로 강제 — Sheets 자동파싱 방지
+    sh.appendRow(['sessionId', 'date', 'time', 'tokens', 'taskId', 'memo']);
     sh.getRange(1, 2, sh.getMaxRows(), 2).setNumberFormat('@');
   }
   const data = sh.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(sessionId)) {
       sh.getRange(i + 1, 4).setValue(Number(tokens) || 0);
+      sh.getRange(i + 1, 5).setValue(taskId || '');
+      sh.getRange(i + 1, 6).setValue(memo || '');
       return jsonp(cb, { ok: true, action: 'updated' });
     }
   }
   const newRowIdx = sh.getLastRow() + 1;
-  sh.appendRow([sessionId, date || '', time || '', Number(tokens) || 0]);
+  sh.appendRow([sessionId, date || '', time || '', Number(tokens) || 0, taskId || '', memo || '']);
   sh.getRange(newRowIdx, 2, 1, 2).setNumberFormat('@');
   return jsonp(cb, { ok: true, action: 'inserted' });
 }
