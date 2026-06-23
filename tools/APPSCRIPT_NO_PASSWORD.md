@@ -13,7 +13,7 @@
 데이터 시트 → 확장 프로그램 → Apps Script → `Code.gs` 내용을 **전부 지우고** 아래로 교체:
 
 ```javascript
-const SHEET_ID = '1HOGCNHqX6Ps-BlNqUXf3w9rxs4KRRY2VyOjuISBk4WE';
+const SHEET_ID = '1yYy_uxc7C-fLaIfVTl88dGKxSDgvWn3emEgxNKF7otY';
 
 function doGet(e) {
   const cb = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : 'cb';

@@ -147,7 +147,7 @@
   // ---- Google Sheets (read-only) data source ----
   var SHEET_ID_KEY = "dashboard-sheet-id";
   // 배포(공개 뷰어) 기본 시트. localStorage에 직접 지정한 값이 있으면 그게 우선.
-  var DEFAULT_SHEET_ID = "1HOGCNHqX6Ps-BlNqUXf3w9rxs4KRRY2VyOjuISBk4WE";
+  var DEFAULT_SHEET_ID = "1yYy_uxc7C-fLaIfVTl88dGKxSDgvWn3emEgxNKF7otY";
   var _loadedSheetId = "";
   function effectiveSheetId() { return getSheetId() || DEFAULT_SHEET_ID; }
   function sheetCsvUrl(sheetId, tab) {

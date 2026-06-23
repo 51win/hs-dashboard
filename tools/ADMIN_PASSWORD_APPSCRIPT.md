@@ -22,7 +22,7 @@
 
 ```javascript
 // 시트에 쓰기 + 비밀번호 검증. 읽기는 대시보드가 gviz로 직접 함(여기선 쓰기만).
-const SHEET_ID = '1HOGCNHqX6Ps-BlNqUXf3w9rxs4KRRY2VyOjuISBk4WE';
+const SHEET_ID = '1yYy_uxc7C-fLaIfVTl88dGKxSDgvWn3emEgxNKF7otY';
 
 function doGet(e) {
   const cb = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : 'cb';
