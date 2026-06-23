@@ -64,8 +64,18 @@
     return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   }
   function parseDate(s) {
-    var p = String(s).split("-");
-    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var str = String(s || "");
+    // ISO 문자열(2026-06-21T...) → YYYY-MM-DD 추출
+    var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return new Date(NaN);
+  }
+  function normalizeDateStr(s) {
+    var str = String(s || "").trim();
+    if (!str) return "";
+    var iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+    return "";
   }
   function daysBetween(due, today) {
     var ms = parseDate(due).getTime() - parseDate(today).getTime();
@@ -380,8 +390,8 @@
         name: String(o.name || ""),
         status: o.status ? String(o.status) : "todo",
         owner: String(o.owner || ""),
-        due: String(o.due || ""),
-        doneAt: String(o.doneAt || ""),
+        due: normalizeDateStr(o.due),
+        doneAt: normalizeDateStr(o.doneAt),
         memo: String(o.memo || ""),
         note: "",
         checklist: [],
@@ -400,8 +410,8 @@
         note: String(o.note || ""),
         importance: o.importance ? String(o.importance) : "mid",
         done: truthyCsv(o.done),
-        due: String(o.due || ""),
-        doneAt: String(o.doneAt || "")
+        due: normalizeDateStr(o.due),
+        doneAt: normalizeDateStr(o.doneAt)
       });
     });
     return { version: 1, groups: SHEET_GROUPS(), tasks: tasks };
