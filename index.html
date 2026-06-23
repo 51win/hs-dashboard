@@ -670,6 +670,30 @@
   .small-row .sm-name-ro.done { color: var(--ink-muted); text-decoration: line-through; }
   .small-row .sm-due-ro { font-size: var(--fs-sub); color: var(--ink-muted); flex: 0 0 auto; }
 
+  /* 토큰 일별 목록 */
+  .tok-daily-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .tok-day-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-card); padding: 9px 14px;
+  }
+  .tok-day-date { font-size: var(--fs-sub); font-weight: 500; color: var(--ink); flex: 0 0 90px; }
+  .tok-day-count { font-size: var(--fs-sub); font-weight: 600; color: var(--primary); flex: 0 0 90px; }
+  .tok-day-memo {
+    font: inherit; font-size: var(--fs-sub); color: var(--ink);
+    background: transparent; border: 1px solid transparent;
+    border-radius: var(--radius-badge); padding: 4px 8px;
+    flex: 1 1 auto; min-width: 0;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
+  }
+  .tok-day-memo:hover { border-color: var(--border); }
+  .tok-day-memo:focus-visible {
+    outline: 2px solid var(--focus-ring); outline-offset: 1px;
+    border-color: var(--primary-weak); background: var(--bg);
+  }
+  .tok-day-memo::placeholder { color: var(--ink-muted); }
+  .tok-day-memo-ro { font-size: var(--fs-sub); color: var(--ink-muted); flex: 1 1 auto; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       transition: none !important;
@@ -680,7 +704,10 @@
 </head>
 <body>
 <div id="app"></div>
-<script>window.DASHBOARD_MODE = "view";</script>
+<script>
+  window.DASHBOARD_MODE = "view";
+  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbx0gauf4nOLK3M_xB_k-Rror6XIqaDGObyfLjs_l_ADkPmZLvRbFpSkTJXOh23xKkrB9Q/exec";
+</script>
 <script src="dashboard-tokens.js"></script>
 <script src="dashboard-core.js"></script>
 </body>

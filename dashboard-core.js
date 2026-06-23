@@ -126,6 +126,42 @@
     });
   }
 
+  // 토큰 메모: sidecar(자동 생성)와 별개로 localStorage에 저장해 statusline 재생성 시에도 유지.
+  var TOKEN_MEMOS_KEY = "dashboard-token-memos";
+  function loadTokenMemos() {
+    try { return JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function saveTokenMemo(date, memo) {
+    var memos = loadTokenMemos();
+    if (memo) memos[date] = memo; else delete memos[date];
+    global.localStorage.setItem(TOKEN_MEMOS_KEY, JSON.stringify(memos));
+  }
+  // sidecar daily에 localStorage 메모를 병합. localStorage 우선.
+  function mergedDailySeries() {
+    var series = dailyTokenSeries();
+    var memos = loadTokenMemos();
+    return series.map(function (d) {
+      return { date: d.date, tokens: d.tokens, cost: d.cost,
+        memo: memos[d.date] !== undefined ? memos[d.date] : (d.memo || "") };
+    });
+  }
+  function dailyListHtml(series) {
+    if (!series.length) return '<div class="empty">아직 기록된 토큰이 없습니다.</div>';
+    var rows = series.slice().reverse().map(function (d) {
+      var tk = d.tokens >= 1000 ? (d.tokens / 1000).toFixed(1) + "k" : String(d.tokens || 0);
+      var cost = typeof d.cost === "number" && d.cost > 0 ? " · $" + d.cost.toFixed(2) : "";
+      var memo = canEdit()
+        ? '<input class="tok-day-memo" data-date="' + esc(d.date) + '" value="' + esc(d.memo) +
+          '" placeholder="어떤 과제 작업했는지 메모">'
+        : (d.memo ? '<span class="tok-day-memo-ro">' + esc(d.memo) + "</span>" : "");
+      return '<div class="tok-day-row">' +
+        '<span class="tok-day-date">' + esc(d.date) + "</span>" +
+        '<span class="tok-day-count">' + tk + esc(cost) + "</span>" +
+        memo + "</div>";
+    }).join("");
+    return '<div class="tok-daily-list">' + rows + "</div>";
+  }
+
   var STORAGE_KEY = "dashboard-data";
   function saveData(data) {
     global.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -152,7 +188,7 @@
   function effectiveSheetId() { return getSheetId() || DEFAULT_SHEET_ID; }
   function sheetCsvUrl(sheetId, tab) {
     return "https://docs.google.com/spreadsheets/d/" + sheetId +
-      "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(tab);
+      "/gviz/tq?tqx=out%3Acsv&sheet=" + encodeURIComponent(tab);
   }
   function parseCsv(text) {
     var s = String(text == null ? "" : text);
@@ -269,10 +305,51 @@
     return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
   }
   function loadFromSheet(sheetId) {
+    // WRITE_ENDPOINT가 있으면 JSONP(Apps Script)로 읽기 — CORS 우회
+    if (WRITE_ENDPOINT && typeof document !== "undefined" && document.head) {
+      return new Promise(function (resolve) {
+        var cb = "__dashRead" + Date.now() + Math.floor(Math.random() * 1000);
+        var s = null, done = false;
+        function cleanup() {
+          try { delete global[cb]; } catch (e) { global[cb] = undefined; }
+          if (s && s.parentNode) s.parentNode.removeChild(s);
+        }
+        var timer = setTimeout(function () {
+          if (done) return; done = true; cleanup();
+          _sheetError = "시트를 불러오지 못했어요. 잠시 후 다시 시도하세요.";
+          _readonly = false; _state = loadData(); rerender(); resolve(null);
+        }, 15000);
+        if (timer && typeof timer.unref === "function") timer.unref();
+        global[cb] = function (res) {
+          if (done) return; done = true; clearTimeout(timer); cleanup();
+          if (res && res.ok) {
+            var tRows = res.tasks || [], cRows = res.checklist || [];
+            // Apps Script returns array-of-arrays; convert to CSV-like strings for parseSheetData
+            var tCsv = tRows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
+            var cCsv = cRows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
+            var parsed = parseSheetData(tCsv, cCsv);
+            _sheetError = ""; _lastSynced = nowTimeStr(); _loadedSheetId = sheetId;
+            applySheetData(parsed);
+          } else {
+            _sheetError = "시트를 불러오지 못했어요: " + (res && res.error ? res.error : "알 수 없는 오류");
+            _readonly = false; _state = loadData(); rerender();
+          }
+          resolve(_state);
+        };
+        s = document.createElement("script");
+        s.src = WRITE_ENDPOINT + "?action=read&callback=" + encodeURIComponent(cb);
+        s.onerror = function () {
+          if (done) return; done = true; clearTimeout(timer); cleanup();
+          _sheetError = "시트를 불러오지 못했어요. 잠시 후 다시 시도하세요.";
+          _readonly = false; _state = loadData(); rerender(); resolve(null);
+        };
+        document.head.appendChild(s);
+      });
+    }
+    // fallback: fetch(gviz CSV)
     if (typeof fetch !== "function") {
-      _sheetError = "이 환경에서는 시트를 불러올 수 없어요. https(GitHub Pages)에서 사용하세요.";
-      _readonly = false;
-      rerender();
+      _sheetError = "이 환경에서는 시트를 불러올 수 없어요.";
+      _readonly = false; rerender();
       return Promise.resolve(null);
     }
     return Promise.all([
@@ -280,16 +357,12 @@
       fetch(sheetCsvUrl(sheetId, "Checklist")).then(function (r) { return r.text(); })
     ]).then(function (texts) {
       var parsed = parseSheetData(texts[0], texts[1]);
-      _sheetError = "";
-      _lastSynced = nowTimeStr();
-      _loadedSheetId = sheetId;
+      _sheetError = ""; _lastSynced = nowTimeStr(); _loadedSheetId = sheetId;
       applySheetData(parsed);
       return _state;
     }).catch(function () {
       _sheetError = "시트를 불러오지 못했어요. 잠시 후 다시 시도하세요.";
-      _readonly = false;
-      _state = loadData();
-      rerender();
+      _readonly = false; _state = loadData(); rerender();
       return null;
     });
   }
@@ -589,8 +662,10 @@
   }
 
   function tokensHtml(data) {
+    var series = mergedDailySeries();
     return '<button class="token-refresh" type="button">새로고침</button>' +
-      "<h2>전체 추이</h2>" + trendChartSvg(dailyTokenSeries()) +
+      "<h2>전체 추이</h2>" + trendChartSvg(series) +
+      "<h2>일별 기록</h2>" + dailyListHtml(series) +
       "<h2>과제별 비교</h2>" + compareChartSvg(data);
   }
 
@@ -643,23 +718,17 @@
       '<span class="sheet-actions"><button class="sheet-refresh" type="button">새로고침</button></span>' +
       "</div>";
   }
-  // 편집(개인) 사이트 배너: 게시 상태 + 게시/불러오기/비밀번호.
+  // 편집(개인) 사이트 배너: 게시 상태.
   function editBannerHtml() {
     var msg = _saveMsg ? '<span class="save-msg">' + esc(_saveMsg) + "</span>" : "";
     return '<div class="sheet-banner admin">' +
-      '<span class="sheet-banner-text">로컬 편집 중 · 시트에 자동 게시</span>' +
+      '<span class="sheet-banner-text">로컬 편집 중</span>' +
       msg +
       '<span class="sheet-actions">' +
       '<button class="admin-save" type="button">지금 게시</button>' +
-      '<button class="sheet-pull" type="button">시트에서 불러오기</button>' +
       "</span></div>";
   }
-  function localActionsHtml() {
-    return '<div class="bar-actions">' +
-      '<button id="export-btn" type="button">내보내기</button>' +
-      '<label class="import-btn">가져오기<input id="import-input" type="file" accept="application/json" hidden></label>' +
-      '</div>';
-  }
+  function localActionsHtml() { return ""; }
   function render(data, rootEl) {
     var isView = MODE === "view";
     var actions = (isView || _tab === "tokens") ? "" : localActionsHtml();
@@ -757,7 +826,8 @@
     if (ed) ed.hidden = !ed.hidden;
   }
   function persistRaw() { saveData(_state); }
-  function persist() { saveData(_state); schedulePush(); }
+  // 자동 게시는 끔(실수로 시트를 덮어쓰는 사고 방지). 게시는 "지금 게시" 버튼으로만.
+  function persist() { saveData(_state); }
   function closestTaskId(el) {
     var n = el.closest("[data-task-id]");
     return n ? n.getAttribute("data-task-id") : null;
@@ -797,21 +867,9 @@
         loadFromSheet(effectiveSheetId());
         return;
       }
-      if (e.target.classList && e.target.classList.contains("sheet-pull")) {
-        pullFromSheet();
-        return;
-      }
       if (e.target.classList && e.target.classList.contains("admin-save")) {
         if (_pushTimer) { try { clearTimeout(_pushTimer); } catch (er) {} _pushTimer = null; }
         saveToSheet();
-        return;
-      }
-      if (e.target.id === "export-btn") {
-        var blob = new global.Blob([exportData(_state)], { type: "application/json" });
-        var url = global.URL.createObjectURL(blob);
-        var a = global.document.createElement("a");
-        a.href = url; a.download = "dashboard-data.json"; a.click();
-        global.URL.revokeObjectURL(url);
         return;
       }
       if (e.target.closest(".editor")) {
@@ -848,13 +906,6 @@
       if (card) openEditor(card.getAttribute("data-task-id"));
     });
     rootEl.addEventListener("change", function (e) {
-      if (e.target.id === "import-input") {
-        if (!e.target.files || !e.target.files[0]) return;
-        e.target.files[0].text().then(function (txt) {
-          try { applyImportedJson(txt); } catch (err) { global.alert("가져오기 실패: " + err.message); }
-        });
-        return;
-      }
       var taskId = closestTaskId(e.target);
       if (!taskId) return;
       if (e.target.classList.contains("sm-done")) { toggleSmallDone(_state, taskId); persist(); rerender(); return; }
@@ -874,6 +925,10 @@
       openEditor(card.getAttribute("data-task-id"));
     });
     rootEl.addEventListener("input", function (e) {
+      if (e.target.classList.contains("tok-day-memo")) {
+        saveTokenMemo(e.target.getAttribute("data-date"), e.target.value);
+        return;
+      }
       var taskId = closestTaskId(e.target);
       if (!taskId) return;
       var t = findTask(_state, taskId); if (!t) return;
