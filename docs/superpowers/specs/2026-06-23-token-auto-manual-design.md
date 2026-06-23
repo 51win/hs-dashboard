@@ -1,106 +1,82 @@
-# Token Auto-Recording & Manual Cowork Upload
+# Token Auto-Recording (All Sessions)
 
-**Date:** 2026-06-23
+**Date:** 2026-06-23 (revised)
 
-## Goals
+## Goal
 
-1. Claude Code 세션 토큰이 statusline 훅을 통해 대시보드에 자동 반영
-2. Cowork 사용분을 대시보드 UI에서 수동으로 추가 (날짜 + 토큰 + 비용 + 메모)
+Claude Code 및 Cowork 서브에이전트 세션 토큰을 모두 자동 집계해 대시보드에 표시.
+비용(cost) 표시는 제거. 수동 입력 UI 불필요.
+
+## Key Insight
+
+Cowork 서브에이전트도 `~/.claude/projects/<project>/*.jsonl`에 transcript를 남김.
+→ 모든 JSONL을 스캔하면 수동 입력 없이 전체 토큰 집계 가능.
 
 ## Architecture
 
-### 데이터 소스 두 개, 렌더링 시 합산
-
 ```
-[자동] statusline.mjs → .dashboard-token-log.json → dashboard-tokens.js
-                                                              ↓ window.DASHBOARD_TOKENS
-                                                         renderTokensTab()
-                                                              ↑ 합산
-[수동] 대시보드 UI 폼 → localStorage["dashboard-manual-tokens"]
+~/.claude/projects/**/*.jsonl   (Claude Code + Cowork 전체)
+         ↓  statusline.mjs (매 틱)
+.dashboard-token-log.json       (session_id → {date, tokens} 캐시)
+         ↓
+dashboard-tokens.js             (window.DASHBOARD_TOKENS)
+         ↓
+dashboard.html 토큰 탭          (날짜별 차트 + 세션 목록)
 ```
 
 ---
 
 ## Part 1: statusline.mjs 수정
 
-### 현재 버그
-- `.dashboard-token-log.json`에 `tokens: 0` 기록됨
-- 원인: stdin 페이로드에 `transcript_path`가 없거나 경로 불일치
+### 변경 내용
 
-### 수정 내용
+**1. 전체 JSONL 스캔**
 
-**1. transcript 자동 탐색 fallback**
+stdin의 `transcript_path` 단일 파일 대신, `~/.claude/projects/` 하위 **모든 `.jsonl`** 을 순회.
 
-`transcript_path`가 비어있으면 다음 경로에서 최신 JSONL 파일 자동 탐색:
 ```
-~/.claude/projects/<encoded-cwd>/*.jsonl
+~/.claude/projects/<any-dir>/*.jsonl
 ```
-`encoded-cwd` = 프로젝트 경로에서 `/` → `-` 변환 (Claude Code 규칙).
 
-**2. 디버그 로그**
+**2. session_id = 파일명 (UUID)**
 
-첫 실행 시 `dashboard-token-debug.log`에 수신 페이로드 기록.
-정상 확인 후 삭제 예정.
+각 JSONL 파일명이 session_id. 이미 처리한 세션은 로그에 캐싱해 재계산 생략.
+단, 현재 활성 세션(`data.session_id`)은 매 틱마다 재계산 (진행 중이므로).
 
-**3. cost 보완**
+**3. 날짜 결정**
 
-`cost.total_cost_usd`가 0이면 transcript usage에서 Sonnet 4.6 단가로 추정:
-- input: $3/M, output: $15/M (캐시 토큰 제외)
+JSONL 내 첫 번째 타임스탬프 필드 사용. 없으면 파일 생성일(birthtime) 사용.
+
+**4. cost 제거**
+
+`cost` 필드 및 `$` 관련 출력 전부 제거.
+상태줄 출력: `[model] 🪙 12.3k tok`
+
+**5. 디버그 로그 제거**
+
+더미 데이터 및 디버그 파일 미생성.
+
+### 출력 형식 변경
+
+```
+window.DASHBOARD_TOKENS = {
+  generatedAt: "...",
+  daily:    [{ date, tokens }],          // cost 제거
+  sessions: [{ sessionId, date, time, tokens }]  // cost 제거, 최근 100개
+}
+```
 
 ---
 
-## Part 2: 대시보드 수동 추가 UI
+## Part 2: dashboard-core.js 수정
 
-### 저장 구조 (localStorage)
+### 변경 내용
 
-Key: `dashboard-manual-tokens`
-Value: JSON 배열
-```json
-[
-  {
-    "id": "manual-1719100000000",
-    "date": "2026-06-23",
-    "tokens": 50000,
-    "cost": 1.50,
-    "memo": "cowork 오전 세션",
-    "source": "cowork",
-    "createdAt": "2026-06-23T09:00:00.000Z"
-  }
-]
-```
-
-### 토큰 탭 UI 변경
-
-**버튼 영역**
-```
-[새로고침]  [+ 수동 추가]
-```
-
-**수동 추가 폼** (+ 버튼 클릭 시 인라인 펼침)
-```
-날짜: [____-__-__]  토큰: [______]  비용($): [____]
-메모: [_________________________]
-                          [저장]  [취소]
-```
-- 날짜 기본값: 오늘
-- 토큰/비용: 숫자 입력, 빈 값 허용 (0 처리)
-- 저장 시 localStorage에 append
-
-**세션 목록 변경**
-- 수동 입력 행: `[cowork]` 배지 + `×` 삭제 버튼
-- 자동 기록 행: 기존 그대로
-
-**일별 합산**
-- `buildMergedDaily()`: `DASHBOARD_TOKENS.daily` + localStorage 수동 데이터를 날짜 키로 합산
-- 차트/테이블 모두 이 합산 데이터 사용
-
-### 렌더링 함수 변경점
-
-`tokensHtml(data)` 및 관련 render 함수:
-1. `loadManualTokens()` — localStorage에서 수동 배열 로드
-2. `buildMergedDaily(auto, manual)` — 날짜별 합산
-3. `buildMergedSessions(auto, manual)` — 세션 목록 합산 (수동은 source 필드로 구분)
-4. `deleteManualToken(id)` — 삭제 후 rerender
+- `cost` 관련 렌더링 코드 전부 제거
+- 토큰 탭: 수동 추가 폼 없음 (localStorage 연동 불필요)
+- 일별 차트/테이블: `tokens` 만 표시
+- 세션 목록: `sessionId`, `date`, `time`, `tokens` 표시
+- "새로고침" 버튼 유지 (dashboard-tokens.js 재로드)
 
 ---
 
@@ -108,15 +84,14 @@ Value: JSON 배열
 
 | 파일 | 변경 |
 |------|------|
-| `tools/statusline.mjs` | transcript 자동 탐색, 디버그 로그 |
-| `dashboard-core.js` | 수동 추가 UI, localStorage 통합, 합산 렌더링 |
-
-`dashboard.html`은 변경 없음 (이미 `dashboard-tokens.js` 로드 중).
+| `tools/statusline.mjs` | 전체 JSONL 스캔, cost 제거, 날짜 자동 탐지 |
+| `dashboard-core.js` | cost 렌더링 제거, 수동 추가 UI 제거 |
+| `.dashboard-token-log.json` | 기존 더미 데이터 초기화 |
 
 ---
 
 ## Out of Scope
 
-- 수동 입력 데이터의 서버 동기화
-- Cowork API 자동 연동
-- 토큰 단가 설정 UI
+- 토큰 단가/비용 표시
+- 수동 입력 UI
+- 외부 API 연동
