@@ -729,7 +729,7 @@
     }
     var valid = dt.sessions.filter(function (s) { return s.date >= START_DATE; });
     if (!valid.length) return '<div class="empty">세션 기록이 없습니다.</div>';
-    var rows = valid.slice(0, 20).map(function (s) {
+    var rows = valid.slice(0, 100).map(function (s) {
       var tk = fmtTok(s.tokens || 0);
       var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
       return '<div class="tok-day-row">' +

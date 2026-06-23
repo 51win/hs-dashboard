@@ -120,21 +120,25 @@ function main() {
     // 완료된 세션은 캐시 재사용 (단, 토큰이 0이면 재계산)
     if (cached && cached.tokens > 0 && !isActive) continue;
 
-    const stat = fs.statSync(filePath);
-    const { tokens, firstTs } = sumTokens(filePath);
-    const sessionDate = firstTs
-      ? localDate(new Date(firstTs))
-      : localDate(new Date(stat.birthtimeMs || stat.mtimeMs));
-    const sessionTime = firstTs
-      ? localTime(new Date(firstTs))
-      : localTime(new Date(stat.birthtimeMs || stat.mtimeMs));
+    try {
+      const stat = fs.statSync(filePath);
+      const { tokens, firstTs } = sumTokens(filePath);
+      const sessionDate = firstTs
+        ? localDate(new Date(firstTs))
+        : localDate(new Date(stat.birthtimeMs || stat.mtimeMs));
+      const sessionTime = firstTs
+        ? localTime(new Date(firstTs))
+        : localTime(new Date(stat.birthtimeMs || stat.mtimeMs));
 
-    log.sessions[sessionId] = {
-      date: (cached && cached.date) || sessionDate,
-      time: (cached && cached.time) || sessionTime,
-      tokens,
-      updatedAt: now.toISOString()
-    };
+      log.sessions[sessionId] = {
+        date: (cached && cached.date) || sessionDate,
+        time: (cached && cached.time) || sessionTime,
+        tokens,
+        updatedAt: now.toISOString()
+      };
+    } catch {
+      continue;
+    }
   }
 
   saveLog(log);
