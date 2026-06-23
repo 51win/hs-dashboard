@@ -1,63 +1,42 @@
 #!/usr/bin/env node
-// Claude Code statusLine script — token usage capture + dashboard sidecar.
-//
-// What it does on every statusLine tick:
-//   1. Reads the JSON session payload Claude Code pipes to stdin.
-//   2. Reads the session transcript (transcript_path JSONL) and sums token
-//      usage across assistant messages to get cumulative session tokens.
-//   3. Records/updates a per-session snapshot in a log file, keyed by session_id
-//      (so re-running the same session updates rather than double-counts).
-//   4. Regenerates `dashboard-tokens.js` next to dashboard.html:
-//         window.DASHBOARD_TOKENS = { generatedAt, daily: [{date, tokens, cost}] }
-//      daily = per-date sum across sessions of each session's latest cumulative.
-//   5. Prints a short status line to stdout (token + cost), so it still works
-//      as a normal status line.
-//
-// Target dashboard folder resolution (first hit wins):
-//   - $CLAUDE_DASHBOARD_DIR
-//   - the folder containing this script's parent (project root, assuming
-//     tools/statusline.mjs inside the dashboard project)
-//
-// Limitation: statusLine has no notion of which dashboard "task" the work
-// belongs to, so this auto-populates the date-wise total only. Per-task tokens
-// are entered manually in the dashboard editor.
-
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_DIR = process.env.CLAUDE_DASHBOARD_DIR || path.resolve(__dirname, "..");
 const LOG_PATH = path.join(DASHBOARD_DIR, ".dashboard-token-log.json");
-const SIDECAR_PATHS = [
-  path.join(DASHBOARD_DIR, "dashboard-tokens.js"),
-  path.join(path.resolve(__dirname, "../../claude/Projects/dashboard"), "dashboard-tokens.js"),
-];
-
-function readStdin() {
-  try { return fs.readFileSync(0, "utf8"); } catch { return ""; }
-}
+const SIDECAR_PATH = path.join(DASHBOARD_DIR, "dashboard-tokens.js");
+const PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 
 function localDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
 }
 
-// Sum input+output+cache tokens across assistant messages in a transcript JSONL.
-function sumTranscriptTokens(transcriptPath) {
-  if (!transcriptPath || !fs.existsSync(transcriptPath)) return 0;
-  let total = 0;
+function localTime(d) {
+  return String(d.getHours()).padStart(2, "0") + ":" +
+    String(d.getMinutes()).padStart(2, "0");
+}
+
+// JSONL 한 파일에서 토큰 합산
+function sumTokens(filePath) {
   let text;
-  try { text = fs.readFileSync(transcriptPath, "utf8"); } catch { return 0; }
+  try { text = fs.readFileSync(filePath, "utf8"); } catch { return { tokens: 0, firstTs: null }; }
+  let total = 0, firstTs = null;
   for (const line of text.split("\n")) {
     const s = line.trim();
     if (!s) continue;
     let obj;
     try { obj = JSON.parse(s); } catch { continue; }
-    // Usage can live at obj.message.usage (Anthropic message format).
-    const usage = (obj && obj.message && obj.message.usage) || obj.usage;
+    // 첫 번째 타임스탬프 수집
+    if (!firstTs) {
+      const ts = obj.timestamp || (obj.message && obj.message.created_at);
+      if (ts) firstTs = ts;
+    }
+    const usage = (obj.message && obj.message.usage) || obj.usage;
     if (usage && typeof usage === "object") {
       total += (usage.input_tokens || 0)
         + (usage.output_tokens || 0)
@@ -65,7 +44,24 @@ function sumTranscriptTokens(transcriptPath) {
         + (usage.cache_read_input_tokens || 0);
     }
   }
-  return total;
+  return { tokens: total, firstTs };
+}
+
+// ~/.claude/projects/ 하위 모든 JSONL 열거
+function allJsonlFiles() {
+  const files = [];
+  if (!fs.existsSync(PROJECTS_DIR)) return files;
+  for (const proj of fs.readdirSync(PROJECTS_DIR)) {
+    const projDir = path.join(PROJECTS_DIR, proj);
+    let entries;
+    try { entries = fs.readdirSync(projDir); } catch { continue; }
+    for (const f of entries) {
+      if (f.endsWith(".jsonl")) {
+        files.push({ sessionId: f.replace(".jsonl", ""), filePath: path.join(projDir, f) });
+      }
+    }
+  }
+  return files;
 }
 
 function loadLog() {
@@ -74,57 +70,86 @@ function loadLog() {
 }
 
 function saveLog(log) {
-  try { fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2)); } catch { /* ignore */ }
+  try { fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2)); } catch {}
 }
 
-// Build daily totals: for each date, sum the latest cumulative tokens/cost of
-// every session whose date matches.
 function buildDaily(log) {
   const byDate = {};
-  for (const sid of Object.keys(log.sessions)) {
-    const s = log.sessions[sid];
+  for (const s of Object.values(log.sessions)) {
     if (!s || !s.date) continue;
-    if (!byDate[s.date]) byDate[s.date] = { date: s.date, tokens: 0, cost: 0 };
-    byDate[s.date].tokens += s.tokens || 0;
-    byDate[s.date].cost += s.cost || 0;
+    byDate[s.date] = (byDate[s.date] || 0) + (s.tokens || 0);
   }
-  return Object.values(byDate).sort((a, b) => (a.date < b.date ? -1 : 1));
+  return Object.entries(byDate)
+    .map(([date, tokens]) => ({ date, tokens }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
-function writeSidecar(daily) {
-  const payload = { generatedAt: new Date().toISOString(), daily };
+function buildSessions(log) {
+  return Object.entries(log.sessions)
+    .map(([sid, s]) => ({
+      sessionId: sid,
+      date: s.date || "",
+      time: s.time || "",
+      tokens: s.tokens || 0,
+      updatedAt: s.updatedAt || ""
+    }))
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+    .slice(0, 100);
+}
+
+function writeSidecar(daily, sessions) {
+  const payload = { generatedAt: new Date().toISOString(), daily, sessions };
   const js = "window.DASHBOARD_TOKENS = " + JSON.stringify(payload, null, 2) + ";\n";
-  for (const p of SIDECAR_PATHS) {
-    try { fs.writeFileSync(p, js); } catch { /* ignore */ }
-  }
+  try { fs.writeFileSync(SIDECAR_PATH, js); } catch {}
 }
 
 function main() {
   let data = {};
-  try { data = JSON.parse(readStdin() || "{}"); } catch { data = {}; }
+  try { data = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch {}
 
-  const sessionId = data.session_id || "unknown";
-  const cost = (data.cost && typeof data.cost.total_cost_usd === "number")
-    ? data.cost.total_cost_usd : 0;
-  const tokens = sumTranscriptTokens(data.transcript_path);
-  const today = localDate(new Date());
+  const now = new Date();
+  const activeSessionId = data.session_id || null;
+  const model = (data.model && data.model.display_name) || "";
 
   const log = loadLog();
-  const prev = log.sessions[sessionId];
-  log.sessions[sessionId] = {
-    // keep the date this session was first seen so its tokens land on one day
-    date: (prev && prev.date) || today,
-    tokens,
-    cost,
-    updatedAt: new Date().toISOString()
-  };
-  saveLog(log);
-  writeSidecar(buildDaily(log));
+  const allFiles = allJsonlFiles();
 
-  // Short status line output.
-  const model = (data.model && data.model.display_name) || "";
-  const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + "k" : String(tokens);
-  process.stdout.write(`[${model}] 🪙 ${tk} tok · $${cost.toFixed(2)}`);
+  for (const { sessionId, filePath } of allFiles) {
+    const isActive = sessionId === activeSessionId;
+    const cached = log.sessions[sessionId];
+    // 완료된 세션은 캐시 재사용 (단, 토큰이 0이면 재계산)
+    if (cached && cached.tokens > 0 && !isActive) continue;
+
+    const stat = fs.statSync(filePath);
+    const { tokens, firstTs } = sumTokens(filePath);
+    const sessionDate = firstTs
+      ? localDate(new Date(firstTs))
+      : localDate(new Date(stat.birthtimeMs || stat.mtimeMs));
+    const sessionTime = firstTs
+      ? localTime(new Date(firstTs))
+      : localTime(new Date(stat.birthtimeMs || stat.mtimeMs));
+
+    log.sessions[sessionId] = {
+      date: (cached && cached.date) || sessionDate,
+      time: (cached && cached.time) || sessionTime,
+      tokens,
+      updatedAt: now.toISOString()
+    };
+  }
+
+  saveLog(log);
+  const daily = buildDaily(log);
+  const sessions = buildSessions(log);
+  writeSidecar(daily, sessions);
+
+  // 현재 세션 토큰 상태줄 출력
+  const currentSession = activeSessionId && log.sessions[activeSessionId];
+  const tk = currentSession
+    ? (currentSession.tokens >= 1000
+        ? (currentSession.tokens / 1000).toFixed(1) + "k"
+        : String(currentSession.tokens))
+    : "0";
+  process.stdout.write(`[${model}] 🪙 ${tk} tok`);
 }
 
 main();
