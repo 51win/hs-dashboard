@@ -78,7 +78,7 @@ test("parseSheetData maps groups, status, checklist with done boolean + importan
 });
 
 test("read-only render via applySheetData hides editors and shows banner", () => {
-  const win = loadDashboard();
+  const win = loadDashboard("view");
   const root = win.document.getElementById("app");
   win.Dashboard.init(root);
   win.Dashboard.applySheetData(
