@@ -61,6 +61,25 @@ function doGet(e) {
   }
 }
 
+function fmtDate(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    return v.getFullYear() + '-' +
+      String(v.getMonth() + 1).padStart(2, '0') + '-' +
+      String(v.getDate()).padStart(2, '0');
+  }
+  return String(v);
+}
+
+function fmtTime(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    return String(v.getHours()).padStart(2, '0') + ':' +
+      String(v.getMinutes()).padStart(2, '0');
+  }
+  return String(v);
+}
+
 function readTokenSessions(cb) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sh = ss.getSheetByName('Sessions');
@@ -68,7 +87,7 @@ function readTokenSessions(cb) {
   const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
   const sessions = rows
     .filter(r => r[0])
-    .map(r => ({ sessionId: String(r[0]), date: String(r[1]), time: String(r[2]), tokens: Number(r[3]) || 0 }));
+    .map(r => ({ sessionId: String(r[0]), date: fmtDate(r[1]), time: fmtTime(r[2]), tokens: Number(r[3]) || 0 }));
   return jsonp(cb, { ok: true, sessions });
 }
 
@@ -79,7 +98,8 @@ function upsertTokenSession(cb, body) {
   const sh = ss.getSheetByName('Sessions') || ss.insertSheet('Sessions');
   if (sh.getLastRow() === 0) {
     sh.appendRow(['sessionId', 'date', 'time', 'tokens']);
-    sh.getRange(1, 3, sh.getMaxRows(), 1).setNumberFormat('@');
+    // date·time 컬럼을 텍스트 포맷으로 강제 — Sheets 자동파싱 방지
+    sh.getRange(1, 2, sh.getMaxRows(), 2).setNumberFormat('@');
   }
   const data = sh.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -90,7 +110,7 @@ function upsertTokenSession(cb, body) {
   }
   const newRowIdx = sh.getLastRow() + 1;
   sh.appendRow([sessionId, date || '', time || '', Number(tokens) || 0]);
-  sh.getRange(newRowIdx, 3).setNumberFormat('@');
+  sh.getRange(newRowIdx, 2, 1, 2).setNumberFormat('@');
   return jsonp(cb, { ok: true, action: 'inserted' });
 }
 
