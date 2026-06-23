@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>프로젝트 대시보드</title>
+<title>프로젝트 대시보드 (편집)</title>
 <style>
   :root {
     /* Surfaces & text */
@@ -670,32 +670,6 @@
   .small-row .sm-name-ro.done { color: var(--ink-muted); text-decoration: line-through; }
   .small-row .sm-due-ro { font-size: var(--fs-sub); color: var(--ink-muted); flex: 0 0 auto; }
 
-  /* 이번 주 합계 */
-  .tok-weekly {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin: 8px 0 24px;
-  }
-  .tok-weekly-label {
-    font-size: var(--fs-sub);
-    font-weight: 500;
-    color: var(--ink-muted);
-    letter-spacing: 0.02em;
-  }
-  .tok-weekly-num {
-    font-size: 2.25rem;
-    font-weight: 700;
-    color: var(--primary);
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-  .tok-weekly-unit {
-    font-size: var(--fs-body);
-    color: var(--ink-muted);
-    font-weight: 400;
-  }
-
   /* 토큰 일별 목록 */
   .tok-daily-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
   .tok-day-row {
@@ -731,8 +705,9 @@
 <body>
 <div id="app"></div>
 <script>
-  window.DASHBOARD_MODE = "view";
-  window.DASHBOARD_READ_ENDPOINT = "https://script.google.com/macros/s/AKfycbzV48f1Y-rG2nOFgW1LY2C7JJSv0ixU0xUsAhpoDdHtRJ07WCKL0uzOsRlfT8UwUBVefg/exec";
+  window.DASHBOARD_MODE = "edit";
+  // 시트 쓰기 주소 — 이 파일(로컬 전용)에만 둔다. 공유 사이트에는 없음.
+  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzV48f1Y-rG2nOFgW1LY2C7JJSv0ixU0xUsAhpoDdHtRJ07WCKL0uzOsRlfT8UwUBVefg/exec";
 </script>
 <script src="dashboard-core.js"></script>
 </body>
