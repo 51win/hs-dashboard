@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import https from "node:https";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -9,6 +10,8 @@ const DASHBOARD_DIR = process.env.CLAUDE_DASHBOARD_DIR || path.resolve(__dirname
 const LOG_PATH = path.join(DASHBOARD_DIR, ".dashboard-token-log.json");
 const SIDECAR_PATH = path.join(DASHBOARD_DIR, "dashboard-tokens.js");
 const PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
+const WRITE_ENDPOINT = process.env.DASHBOARD_WRITE_ENDPOINT ||
+  "https://script.google.com/macros/s/AKfycbzV48f1Y-rG2nOFgW1LY2C7JJSv0ixU0xUsAhpoDdHtRJ07WCKL0uzOsRlfT8UwUBVefg/exec";
 
 function localDate(d) {
   return d.getFullYear() + "-" +
@@ -103,6 +106,16 @@ function writeSidecar(daily, sessions) {
   try { fs.writeFileSync(SIDECAR_PATH, js); } catch {}
 }
 
+function upsertToSheets(sessionId, date, time, tokens) {
+  if (!WRITE_ENDPOINT) return;
+  const payload = JSON.stringify({ sessionId, date, time, tokens });
+  const url = WRITE_ENDPOINT +
+    "?action=upsertTokenSession" +
+    "&payload=" + encodeURIComponent(payload) +
+    "&callback=_dummy";
+  https.get(url, () => {}).on("error", () => {});
+}
+
 function main() {
   let data = {};
   try { data = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch {}
@@ -146,7 +159,13 @@ function main() {
   const sessions = buildSessions(log);
   writeSidecar(daily, sessions);
 
-  // 현재 세션 토큰 상태줄 출력
+  // 활성 세션 upsert to Sheets (fire-and-forget)
+  if (activeSessionId && log.sessions[activeSessionId]) {
+    const s = log.sessions[activeSessionId];
+    upsertToSheets(activeSessionId, s.date, s.time, s.tokens);
+  }
+
+  // stdout 출력
   const currentSession = activeSessionId && log.sessions[activeSessionId];
   const tk = currentSession
     ? (currentSession.tokens >= 1000
