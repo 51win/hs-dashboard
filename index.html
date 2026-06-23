@@ -719,6 +719,28 @@
   }
   .tok-day-memo::placeholder { color: var(--ink-muted); }
   .tok-day-memo-ro { font-size: var(--fs-sub); color: var(--ink-muted); flex: 1 1 auto; }
+  .tok-session-tag, .tok-session-memo {
+    font-size: var(--fs-sub);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--ink);
+    outline: none;
+    min-width: 80px;
+  }
+  .tok-session-tag { max-width: 140px; }
+  .tok-session-memo { flex: 1 1 auto; }
+  .tok-session-tag:hover, .tok-session-memo:hover { border-color: var(--border); }
+  .tok-session-tag:focus-visible, .tok-session-memo:focus-visible {
+    border-color: var(--primary);
+    background: var(--surface);
+  }
+  .tok-session-tag-ro, .tok-session-memo-ro {
+    font-size: var(--fs-sub);
+    color: var(--ink-muted);
+  }
+  .tok-session-tag-ro { margin-right: 4px; font-weight: 500; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -732,7 +754,7 @@
 <div id="app"></div>
 <script>
   window.DASHBOARD_MODE = "view";
-  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyTF2rx3EwXUeuF_zExpbasSwmAHD0vbmsEhqyydQI6mug24B7_IfT8-ncW4xTe9gFGHQ/exec";
+  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyZBWB9Zso_fKcmaQ0bdXml_1lbbYB17LgcwekMy0ULpmZALV2DCiRnZmZzwVKj2gf05w/exec";
   window.DASHBOARD_READ_ENDPOINT = window.DASHBOARD_WRITE_ENDPOINT;
 </script>
 <script src="dashboard-core.js"></script>

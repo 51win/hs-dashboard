@@ -906,15 +906,50 @@
     if (!sessions) return '<div class="empty">불러오는 중...</div>';
     var valid = sessions.filter(function (s) { return s.date >= START_DATE; });
     if (!valid.length) return '<div class="empty">세션 기록이 없습니다.</div>';
+
+    // datalist: 모든 과제 이름 (edit 모드에서만 사용)
+    var allTasks = (_state && _state.tasks) ? _state.tasks : [];
+    var datalistHtml = canEdit()
+      ? '<datalist id="task-name-list">' +
+          allTasks.map(function (t) { return '<option value="' + esc(t.name) + '">'; }).join("") +
+        '</datalist>'
+      : "";
+
     var rows = valid.slice(0, 100).map(function (s) {
       var tk = fmtTok(Number(s.tokens) || 0);
       var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
-      return '<div class="tok-day-row">' +
-        '<span class="tok-day-date">' + when + "</span>" +
-        '<span class="tok-day-count">' + tk + "</span>" +
-        "</div>";
+      // 태그된 과제 이름 찾기
+      var taggedTask = null;
+      if (s.taskId && _state && _state.tasks) {
+        for (var i = 0; i < _state.tasks.length; i++) {
+          if (_state.tasks[i].id === s.taskId) { taggedTask = _state.tasks[i]; break; }
+        }
+      }
+      var tagName = taggedTask ? taggedTask.name : "";
+      if (canEdit()) {
+        return '<div class="tok-day-row tok-session-row">' +
+          '<span class="tok-day-date">' + when + '</span>' +
+          '<span class="tok-day-count">' + tk + '</span>' +
+          '<input class="tok-session-tag" list="task-name-list"' +
+            ' data-session-id="' + esc(s.sessionId) + '"' +
+            ' value="' + esc(tagName) + '"' +
+            ' placeholder="과제 태그">' +
+          '<input class="tok-session-memo"' +
+            ' data-session-id="' + esc(s.sessionId) + '"' +
+            ' value="' + esc(s.memo || "") + '"' +
+            ' placeholder="메모">' +
+          '</div>';
+      } else {
+        return '<div class="tok-day-row tok-session-row">' +
+          '<span class="tok-day-date">' + when + '</span>' +
+          '<span class="tok-day-count">' + tk + '</span>' +
+          (tagName ? '<span class="tok-session-tag-ro">' + esc(tagName) + '</span>' : '') +
+          (s.memo ? '<span class="tok-session-memo-ro">' + esc(s.memo) + '</span>' : '') +
+          '</div>';
+      }
     }).join("");
-    return '<div class="tok-daily-list">' + rows + "</div>";
+
+    return datalistHtml + '<div class="tok-daily-list">' + rows + '</div>';
   }
 
   function weeklyHtml(series) {
@@ -1199,6 +1234,20 @@
     rootEl.addEventListener("input", function (e) {
       if (e.target.classList.contains("tok-day-memo")) {
         saveTokenMemo(e.target.getAttribute("data-date"), e.target.value);
+        return;
+      }
+      if (e.target.classList.contains("tok-session-memo")) {
+        saveSessionField(e.target.getAttribute("data-session-id"), "memo", e.target.value);
+        return;
+      }
+      if (e.target.classList.contains("tok-session-tag")) {
+        var inputName = e.target.value.trim();
+        var allTasks = (_state && _state.tasks) ? _state.tasks : [];
+        var matched = null;
+        for (var i = 0; i < allTasks.length; i++) {
+          if (allTasks[i].name === inputName) { matched = allTasks[i]; break; }
+        }
+        saveSessionField(e.target.getAttribute("data-session-id"), "taskId", matched ? matched.id : "");
         return;
       }
       var taskId = closestTaskId(e.target);
