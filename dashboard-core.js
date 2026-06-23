@@ -127,6 +127,33 @@
   var _tokenSessions = null;
   var _tokenSessionsLoading = false;
 
+  function normalizeTokenSession(s) {
+    var date = s.date || "";
+    var time = s.time || "";
+    // Sheets가 Date 객체를 toString()으로 반환할 때 정규화
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      var d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        date = d.getFullYear() + "-" +
+          String(d.getMonth() + 1).padStart(2, "0") + "-" +
+          String(d.getDate()).padStart(2, "0");
+      } else {
+        date = "";
+      }
+    }
+    // time이 Date 문자열인 경우 HH:MM만 추출
+    if (time && !/^\d{2}:\d{2}$/.test(time)) {
+      var dt = new Date(time);
+      if (!isNaN(dt.getTime())) {
+        time = String(dt.getHours()).padStart(2, "0") + ":" +
+          String(dt.getMinutes()).padStart(2, "0");
+      } else {
+        time = "";
+      }
+    }
+    return { sessionId: s.sessionId, date: date, time: time, tokens: s.tokens };
+  }
+
   function loadTokenSessionsFromSheet(onDone) {
     if (!READ_ENDPOINT) { onDone([]); return; }
     if (typeof document === "undefined" || !document.createElement || !document.head) { onDone([]); return; }
@@ -138,7 +165,9 @@
       delete global[cb];
       document.head.removeChild(s);
       _tokenSessionsLoading = false;
-      _tokenSessions = (res && res.ok && Array.isArray(res.sessions)) ? res.sessions : [];
+      _tokenSessions = (res && res.ok && Array.isArray(res.sessions))
+        ? res.sessions.map(normalizeTokenSession)
+        : [];
       onDone(_tokenSessions);
     };
     s.onerror = function () {
