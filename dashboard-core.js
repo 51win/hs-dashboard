@@ -222,7 +222,7 @@
   var _sessionDebounceTimers = {};
 
   function upsertTokenSessionToSheet(sessionId, patch) {
-    var ep = READ_ENDPOINT || WRITE_ENDPOINT;
+    var ep = WRITE_ENDPOINT || READ_ENDPOINT;
     if (!ep || typeof document === "undefined" || !document.head) return;
     // 현재 캐시에서 해당 세션 찾아 병합
     var sessions = _tokenSessions || [];
