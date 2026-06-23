@@ -217,14 +217,19 @@
     return merged;
   }
 
+  var _memoDebounceTimers = {};
   function saveTokenMemo(date, memo) {
     // localStorage에 즉시 저장
     var memos = {};
     try { memos = JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) {}
     if (memo) memos[date] = memo; else delete memos[date];
     global.localStorage.setItem(TOKEN_MEMOS_KEY, JSON.stringify(memos));
-    // Sheets에도 upsert (fire-and-forget)
-    upsertTokenMemoToSheet(date, memo);
+    // Sheets에는 debounce 후 전송 (타이핑 중 중간값이 덮어쓰는 문제 방지)
+    if (_memoDebounceTimers[date]) clearTimeout(_memoDebounceTimers[date]);
+    _memoDebounceTimers[date] = setTimeout(function () {
+      delete _memoDebounceTimers[date];
+      upsertTokenMemoToSheet(date, memo);
+    }, 800);
   }
 
   function upsertTokenMemoToSheet(date, memo) {
@@ -873,13 +878,18 @@
       '</div>';
   }
 
+  var _tokenMemosLoading = false;
   function tokensHtml(data) {
-    if (_tokenSessions === null && !_tokenSessionsLoading) {
-      // 최초 진입: 세션 + 메모 동시 로드 후 재렌더
-      var sessionsReady = false, memosReady = false;
+    var sessionsNull = _tokenSessions === null && !_tokenSessionsLoading;
+    var memosNull = _sheetMemos === null && !_tokenMemosLoading;
+    if (sessionsNull || memosNull) {
+      var sessionsReady = !sessionsNull, memosReady = !memosNull;
       function onReady() { if (sessionsReady && memosReady && _tab === "tokens") rerender(); }
-      loadTokenSessionsFromSheet(function () { sessionsReady = true; onReady(); });
-      loadTokenMemosFromSheet(function () { memosReady = true; onReady(); });
+      if (sessionsNull) loadTokenSessionsFromSheet(function () { sessionsReady = true; onReady(); });
+      if (memosNull) {
+        _tokenMemosLoading = true;
+        loadTokenMemosFromSheet(function () { _tokenMemosLoading = false; memosReady = true; onReady(); });
+      }
       return '<div class="empty">불러오는 중...</div>';
     }
     var series = mergedDailySeries();
