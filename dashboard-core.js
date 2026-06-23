@@ -712,7 +712,11 @@
   }
   function barHtml(task) {
     var p = taskProgress(task);
-    return '<div class="bar"><i style="width:' + p + '%"></i></div><span class="pct">' + p + "%</span>";
+    var sessTok = sessionTokensForTask(task.id);
+    var tokBadge = sessTok > 0
+      ? '<span class="tok-badge">' + fmtTok(sessTok) + ' tok</span>'
+      : '';
+    return '<div class="bar"><i style="width:' + p + '%"></i></div><span class="pct">' + p + '%</span>' + tokBadge;
   }
 
   function editorHtml(t) {
@@ -830,6 +834,13 @@
       });
     }
     return html;
+  }
+
+  function sessionTokensForTask(taskId) {
+    if (!taskId || !_tokenSessions) return 0;
+    return (_tokenSessions || []).reduce(function (sum, s) {
+      return sum + (s.taskId === taskId ? (Number(s.tokens) || 0) : 0);
+    }, 0);
   }
 
   function todayRowHtml(entry, today) {
