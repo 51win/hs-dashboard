@@ -1240,6 +1240,8 @@
         saveSessionField(e.target.getAttribute("data-session-id"), "memo", e.target.value);
         return;
       }
+      // saveSessionField debounces Sheets writes by 800ms; partial-name inputs resolve to "" locally
+      // but the Sheets call is only sent after the user stops typing
       if (e.target.classList.contains("tok-session-tag")) {
         var inputName = e.target.value.trim();
         var allTasks = (_state && _state.tasks) ? _state.tasks : [];
