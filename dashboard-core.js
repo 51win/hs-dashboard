@@ -161,7 +161,7 @@
         time = "";
       }
     }
-    return { sessionId: s.sessionId, date: date, time: time, tokens: s.tokens };
+    return { sessionId: s.sessionId, date: date, time: time, tokens: s.tokens, taskId: s.taskId || "", memo: s.memo || "" };
   }
 
   function loadTokenSessionsFromSheet(onDone) {
@@ -218,6 +218,55 @@
   }
 
   var _memoDebounceTimers = {};
+
+  var _sessionDebounceTimers = {};
+
+  function upsertTokenSessionToSheet(sessionId, patch) {
+    var ep = READ_ENDPOINT || WRITE_ENDPOINT;
+    if (!ep || typeof document === "undefined" || !document.head) return;
+    // 현재 캐시에서 해당 세션 찾아 병합
+    var sessions = _tokenSessions || [];
+    var existing = null;
+    for (var i = 0; i < sessions.length; i++) {
+      if (sessions[i].sessionId === sessionId) { existing = sessions[i]; break; }
+    }
+    if (!existing) return;
+    var merged = {
+      sessionId: existing.sessionId,
+      date: existing.date,
+      time: existing.time,
+      tokens: existing.tokens,
+      taskId: patch.taskId !== undefined ? patch.taskId : (existing.taskId || ""),
+      memo: patch.memo !== undefined ? patch.memo : (existing.memo || "")
+    };
+    var cb = "__dashSessWrite" + Date.now() + Math.floor(Math.random() * 1000);
+    var s = document.createElement("script");
+    var payload = JSON.stringify(merged);
+    s.src = ep + "?action=upsertTokenSession&payload=" + encodeURIComponent(payload) + "&callback=" + encodeURIComponent(cb);
+    global[cb] = function () { try { delete global[cb]; } catch (e) {} if (s.parentNode) s.parentNode.removeChild(s); };
+    s.onerror = function () { try { delete global[cb]; } catch (e) {} if (s.parentNode) s.parentNode.removeChild(s); };
+    document.head.appendChild(s);
+  }
+
+  function saveSessionField(sessionId, field, value) {
+    // 캐시를 즉시 업데이트
+    var sessions = _tokenSessions || [];
+    for (var i = 0; i < sessions.length; i++) {
+      if (sessions[i].sessionId === sessionId) {
+        sessions[i][field] = value;
+        break;
+      }
+    }
+    var key = sessionId + "_" + field;
+    if (_sessionDebounceTimers[key]) clearTimeout(_sessionDebounceTimers[key]);
+    _sessionDebounceTimers[key] = setTimeout(function () {
+      delete _sessionDebounceTimers[key];
+      var patch = {};
+      patch[field] = value;
+      upsertTokenSessionToSheet(sessionId, patch);
+    }, 800);
+  }
+
   function saveTokenMemo(date, memo) {
     // localStorage에 즉시 저장
     var memos = {};
