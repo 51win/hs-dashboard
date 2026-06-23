@@ -204,13 +204,65 @@
 
   // 토큰 메모: sidecar(자동 생성)와 별개로 localStorage에 저장해 statusline 재생성 시에도 유지.
   var TOKEN_MEMOS_KEY = "dashboard-token-memos";
+  var _sheetMemos = null; // Sheets에서 로드된 메모 캐시 { date: memo }
+
   function loadTokenMemos() {
-    try { return JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) { return {}; }
+    var local = {};
+    try { local = JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) {}
+    if (!_sheetMemos) return local;
+    // Sheets 메모와 로컬 메모 병합 (로컬 우선)
+    var merged = {};
+    Object.keys(_sheetMemos).forEach(function (d) { merged[d] = _sheetMemos[d]; });
+    Object.keys(local).forEach(function (d) { if (local[d]) merged[d] = local[d]; else delete merged[d]; });
+    return merged;
   }
+
   function saveTokenMemo(date, memo) {
-    var memos = loadTokenMemos();
+    // localStorage에 즉시 저장
+    var memos = {};
+    try { memos = JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) {}
     if (memo) memos[date] = memo; else delete memos[date];
     global.localStorage.setItem(TOKEN_MEMOS_KEY, JSON.stringify(memos));
+    // Sheets에도 upsert (fire-and-forget)
+    upsertTokenMemoToSheet(date, memo);
+  }
+
+  function upsertTokenMemoToSheet(date, memo) {
+    var ep = READ_ENDPOINT || WRITE_ENDPOINT;
+    if (!ep || typeof document === "undefined" || !document.head) return;
+    var cb = "__dashMemoWrite" + Date.now() + Math.floor(Math.random() * 1000);
+    var s = document.createElement("script");
+    var payload = JSON.stringify({ date: date, memo: memo || "" });
+    s.src = ep + "?action=upsertTokenMemo&payload=" + encodeURIComponent(payload) + "&callback=" + encodeURIComponent(cb);
+    global[cb] = function () { try { delete global[cb]; } catch (e) {} if (s.parentNode) s.parentNode.removeChild(s); };
+    s.onerror = function () { try { delete global[cb]; } catch (e) {} if (s.parentNode) s.parentNode.removeChild(s); };
+    document.head.appendChild(s);
+  }
+
+  function loadTokenMemosFromSheet(onDone) {
+    var ep = READ_ENDPOINT || WRITE_ENDPOINT;
+    if (!ep || typeof document === "undefined" || !document.head) { onDone({}); return; }
+    var cb = "__dashMemoRead" + Date.now() + Math.floor(Math.random() * 1000);
+    var s = document.createElement("script");
+    s.src = ep + "?action=readTokenMemos&callback=" + encodeURIComponent(cb);
+    global[cb] = function (res) {
+      try { delete global[cb]; } catch (e) {}
+      if (s.parentNode) s.parentNode.removeChild(s);
+      _sheetMemos = (res && res.ok && res.memos) ? res.memos : {};
+      // 로컬 캐시도 Sheets 기준으로 동기화
+      var local = {};
+      try { local = JSON.parse(global.localStorage.getItem(TOKEN_MEMOS_KEY) || "{}"); } catch (e) {}
+      Object.keys(_sheetMemos).forEach(function (d) { if (!local[d]) local[d] = _sheetMemos[d]; });
+      global.localStorage.setItem(TOKEN_MEMOS_KEY, JSON.stringify(local));
+      onDone(_sheetMemos);
+    };
+    s.onerror = function () {
+      try { delete global[cb]; } catch (e) {}
+      if (s.parentNode) s.parentNode.removeChild(s);
+      _sheetMemos = {};
+      onDone({});
+    };
+    document.head.appendChild(s);
   }
   function mergedDailySeries() {
     var series = dailyTokenSeries();
@@ -823,8 +875,11 @@
 
   function tokensHtml(data) {
     if (_tokenSessions === null && !_tokenSessionsLoading) {
-      // 최초 진입: Sheets에서 로드 후 재렌더
-      loadTokenSessionsFromSheet(function () { if (_tab === "tokens") rerender(); });
+      // 최초 진입: 세션 + 메모 동시 로드 후 재렌더
+      var sessionsReady = false, memosReady = false;
+      function onReady() { if (sessionsReady && memosReady && _tab === "tokens") rerender(); }
+      loadTokenSessionsFromSheet(function () { sessionsReady = true; onReady(); });
+      loadTokenMemosFromSheet(function () { memosReady = true; onReady(); });
       return '<div class="empty">불러오는 중...</div>';
     }
     var series = mergedDailySeries();
@@ -839,6 +894,7 @@
 
   function refreshTokensTab() {
     _tokenSessions = null;
+    _sheetMemos = null;
     if (_tab === "tokens") rerender();
   }
   function setupTokenPolling() {
