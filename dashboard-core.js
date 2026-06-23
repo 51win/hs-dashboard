@@ -115,15 +115,17 @@
     });
     return { dueToday: dueToday, doneToday: doneToday, dueThisWeek: dueThisWeek };
   }
+  var START_DATE = "2026-06-22"; // 클로드 설치일 이전 데이터 무시
+
   function taskTokenTotal(task) {
     return (task.tokens || []).reduce(function (sum, e) { return sum + (Number(e.tokens) || 0); }, 0);
   }
   function dailyTokenSeries() {
     var dt = global.DASHBOARD_TOKENS;
     if (!dt || !Array.isArray(dt.daily)) return [];
-    return dt.daily.slice().sort(function (a, b) {
-      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-    });
+    return dt.daily
+      .filter(function (d) { return d.date >= START_DATE; })
+      .slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
   }
 
   // 토큰 메모: sidecar(자동 생성)와 별개로 localStorage에 저장해 statusline 재생성 시에도 유지.
@@ -136,27 +138,84 @@
     if (memo) memos[date] = memo; else delete memos[date];
     global.localStorage.setItem(TOKEN_MEMOS_KEY, JSON.stringify(memos));
   }
-  // sidecar daily에 localStorage 메모를 병합. localStorage 우선.
   function mergedDailySeries() {
     var series = dailyTokenSeries();
     var memos = loadTokenMemos();
     return series.map(function (d) {
-      return { date: d.date, tokens: d.tokens, cost: d.cost,
+      return { date: d.date, tokens: d.tokens,
         memo: memos[d.date] !== undefined ? memos[d.date] : (d.memo || "") };
     });
   }
+
+  // 이번 주(월~일) 합계
+  function weeklyTokens(series) {
+    var now = new Date();
+    var day = now.getDay(); // 0=일
+    var monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    var mondayStr = localDateStr(monday);
+    return series.reduce(function (sum, d) {
+      return sum + (d.date >= mondayStr ? (d.tokens || 0) : 0);
+    }, 0);
+  }
+  function localDateStr(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function fmtTok(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+    return String(n || 0);
+  }
+
+  // 시간대별 집계 (sessions의 time 필드 → 0~23시)
+  function hourlyBuckets() {
+    var dt = global.DASHBOARD_TOKENS;
+    var buckets = {};
+    if (dt && Array.isArray(dt.sessions)) {
+      dt.sessions.forEach(function (s) {
+        if (!s.time || s.date < START_DATE) return;
+        var h = parseInt(s.time.split(":")[0], 10);
+        if (isNaN(h) || h < 0 || h > 23) return;
+        buckets[h] = (buckets[h] || 0) + (s.tokens || 0);
+      });
+    }
+    return buckets;
+  }
+
+  function hourlyChartSvg() {
+    var buckets = hourlyBuckets();
+    var hours = Object.keys(buckets).map(Number).sort(function (a, b) { return a - b; });
+    if (!hours.length) return '<div class="empty">세션 시각 데이터가 없습니다. statusline.mjs 실행 후 쌓입니다.</div>';
+    var W = 600, H = 160, padL = 8, padB = 24, padT = 8, padR = 8;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var max = hours.reduce(function (m, h) { return Math.max(m, buckets[h]); }, 0) || 1;
+    var n = hours.length;
+    var bw = Math.max(16, plotW / Math.max(n, 8));
+    var bars = hours.map(function (h, i) {
+      var v = buckets[h];
+      var barH = Math.max(2, Math.round((v / max) * plotH));
+      var x = padL + i * bw + bw * 0.1;
+      var y = padT + (plotH - barH);
+      var tip = h + "시 · " + v.toLocaleString() + " tok";
+      return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.8) + '" height="' + barH + '" rx="2" fill="var(--primary-weak)">' +
+        '<title>' + esc(tip) + '</title></rect>' +
+        '<text x="' + (x + bw * 0.4) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + h + '</text>';
+    }).join("");
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="시간대별 토큰 사용">' + bars + "</svg>";
+  }
+
   function dailyListHtml(series) {
     if (!series.length) return '<div class="empty">아직 기록된 토큰이 없습니다.</div>';
     var rows = series.slice().reverse().map(function (d) {
-      var tk = d.tokens >= 1000 ? (d.tokens / 1000).toFixed(1) + "k" : String(d.tokens || 0);
-      var cost = typeof d.cost === "number" && d.cost > 0 ? " · $" + d.cost.toFixed(2) : "";
+      var tk = fmtTok(d.tokens);
       var memo = canEdit()
         ? '<input class="tok-day-memo" data-date="' + esc(d.date) + '" value="' + esc(d.memo) +
-          '" placeholder="어떤 과제 작업했는지 메모">'
+          '" placeholder="메모 (선택)">'
         : (d.memo ? '<span class="tok-day-memo-ro">' + esc(d.memo) + "</span>" : "");
       return '<div class="tok-day-row">' +
         '<span class="tok-day-date">' + esc(d.date) + "</span>" +
-        '<span class="tok-day-count">' + tk + esc(cost) + "</span>" +
+        '<span class="tok-day-count">' + tk + "</span>" +
         memo + "</div>";
     }).join("");
     return '<div class="tok-daily-list">' + rows + "</div>";
@@ -622,7 +681,7 @@
 
   function trendChartSvg(series) {
     if (!series.length) return '<div class="empty">토큰 추이 데이터가 없습니다.</div>';
-    var W = 600, H = 200, padL = 44, padB = 28, padT = 12, padR = 12;
+    var W = 600, H = 180, padL = 40, padB = 28, padT = 12, padR = 12;
     var plotW = W - padL - padR, plotH = H - padT - padB;
     var max = series.reduce(function (m, d) { return Math.max(m, Number(d.tokens) || 0); }, 0) || 1;
     var n = series.length;
@@ -632,12 +691,13 @@
       var h = Math.round((v / max) * plotH);
       var x = padL + i * bw + bw * 0.15;
       var y = padT + (plotH - h);
-      var lbl = n <= 12 ? '<text x="' + (x + bw * 0.35) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + esc(d.date.slice(5)) + "</text>" : "";
+      var tip = d.date.slice(5) + " · " + v.toLocaleString() + " tok";
+      var lbl = n <= 14 ? '<text x="' + (x + bw * 0.35) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + esc(d.date.slice(5)) + "</text>" : "";
       return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.7) + '" height="' + h +
-        '" rx="2" fill="var(--primary)"></rect>' + lbl;
+        '" rx="2" fill="var(--primary)"><title>' + esc(tip) + "</title></rect>" + lbl;
     }).join("");
-    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="전체 토큰 추이">' +
-      '<text x="' + padL + '" y="' + (padT + 4) + '" class="ax" text-anchor="end" dx="-4">' + max + "</text>" +
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="일별 토큰 추이">' +
+      '<text x="' + padL + '" y="' + (padT + 4) + '" class="ax" text-anchor="end" dx="-4">' + esc(fmtTok(max)) + "</text>" +
       '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '" stroke="var(--border)"></line>' +
       bars + "</svg>";
   }
@@ -661,11 +721,43 @@
     return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="과제별 토큰 비교">' + rows + "</svg>";
   }
 
+  // 세션별 목록 (날짜 + 시작 시각 + 토큰, cost 없음)
+  function sessionsHtml() {
+    var dt = global.DASHBOARD_TOKENS;
+    if (!dt || !Array.isArray(dt.sessions) || !dt.sessions.length) {
+      return '<div class="empty">세션 기록이 없습니다.</div>';
+    }
+    var valid = dt.sessions.filter(function (s) { return s.date >= START_DATE; });
+    if (!valid.length) return '<div class="empty">세션 기록이 없습니다.</div>';
+    var rows = valid.slice(0, 20).map(function (s) {
+      var tk = fmtTok(s.tokens || 0);
+      var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
+      return '<div class="tok-day-row">' +
+        '<span class="tok-day-date">' + when + "</span>" +
+        '<span class="tok-day-count">' + tk + "</span>" +
+        "</div>";
+    }).join("");
+    return '<div class="tok-daily-list">' + rows + "</div>";
+  }
+
+  function weeklyHtml(series) {
+    var weekly = weeklyTokens(series);
+    var label = fmtTok(weekly);
+    return '<div class="tok-weekly">' +
+      '<span class="tok-weekly-label">이번 주</span>' +
+      '<span class="tok-weekly-num">' + label + '</span>' +
+      '<span class="tok-weekly-unit">tok</span>' +
+      '</div>';
+  }
+
   function tokensHtml(data) {
     var series = mergedDailySeries();
     return '<button class="token-refresh" type="button">새로고침</button>' +
-      "<h2>전체 추이</h2>" + trendChartSvg(series) +
+      weeklyHtml(series) +
+      "<h2>시간대별 사용</h2>" + hourlyChartSvg() +
+      "<h2>일별 추이</h2>" + trendChartSvg(series) +
       "<h2>일별 기록</h2>" + dailyListHtml(series) +
+      "<h2>세션별 기록</h2>" + sessionsHtml() +
       "<h2>과제별 비교</h2>" + compareChartSvg(data);
   }
 
