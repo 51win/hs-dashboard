@@ -13,19 +13,39 @@
 데이터 시트 → 확장 프로그램 → Apps Script → `Code.gs` 내용을 **전부 지우고** 아래로 교체:
 
 ```javascript
-// ⚠️ Sessions 탭 time 컬럼은 텍스트 포맷(@)으로 강제 설정 필요 — Sheets 자동파싱 방지
 const SHEET_ID = '1yYy_uxc7C-fLaIfVTl88dGKxSDgvWn3emEgxNKF7otY';
 
 function doGet(e) {
   const cb = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : 'cb';
   try {
-    // 안전장치 1: payload 파라미터가 없으면(주소 직접 방문 등) 절대 쓰지 않음.
+    const action = e && e.parameter && e.parameter.action;
+
+    if (action === 'readTokenSessions') {
+      return readTokenSessions(cb);
+    }
+
+    if (action === 'upsertTokenSession') {
+      const raw = e && e.parameter && e.parameter.payload;
+      if (!raw) return jsonp(cb, { ok: false, error: 'no payload' });
+      const body = JSON.parse(raw);
+      return upsertTokenSession(cb, body);
+    }
+
+    if (action === 'read') {
+      const ss = SpreadsheetApp.openById(SHEET_ID);
+      const tasksSh = ss.getSheetByName('Tasks');
+      const clSh = ss.getSheetByName('Checklist');
+      const tasks = tasksSh ? tasksSh.getDataRange().getValues() : [];
+      const checklist = clSh ? clSh.getDataRange().getValues() : [];
+      return jsonp(cb, { ok: true, tasks, checklist });
+    }
+
+    // 기존: Tasks/Checklist 쓰기 (payload 파라미터)
     const raw = e && e.parameter && e.parameter.payload;
     if (!raw) return jsonp(cb, { ok: false, error: 'no payload (read-only call ignored)' });
     const body = JSON.parse(raw);
     const tasks = Array.isArray(body.tasks) ? body.tasks : null;
     const checklist = Array.isArray(body.checklist) ? body.checklist : [];
-    // 안전장치 2: tasks가 배열이 아니거나 완전히 비어 있으면 덮어쓰기 거부(실수로 시트 비우기 방지).
     if (!tasks || tasks.length === 0) {
       return jsonp(cb, { ok: false, error: 'empty payload ignored (sheet not overwritten)' });
     }
@@ -35,23 +55,21 @@ function doGet(e) {
     writeTab(ss, 'Checklist',
       ['taskId','id','text','note','importance','done','due','doneAt'], checklist);
     return jsonp(cb, { ok: true, tasks: tasks.length, checklist: checklist.length });
+
   } catch (err) {
     return jsonp(cb, { ok: false, error: String(err) });
   }
 }
 
-function writeTab(ss, name, header, rows) {
-  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
-  sh.clearContents();
-  const out = [header].concat(rows.map(function (r) {
-    return header.map(function (h) { return r[h] == null ? '' : r[h]; });
-  }));
-  sh.getRange(1, 1, out.length, header.length).setValues(out);
-}
-
-function jsonp(cb, obj) {
-  return ContentService.createTextOutput(cb + '(' + JSON.stringify(obj) + ')')
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+function readTokenSessions(cb) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sh = ss.getSheetByName('Sessions');
+  if (!sh || sh.getLastRow() < 2) return jsonp(cb, { ok: true, sessions: [] });
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  const sessions = rows
+    .filter(r => r[0])
+    .map(r => ({ sessionId: String(r[0]), date: String(r[1]), time: String(r[2]), tokens: Number(r[3]) || 0 }));
+  return jsonp(cb, { ok: true, sessions });
 }
 
 function upsertTokenSession(cb, body) {
@@ -74,6 +92,20 @@ function upsertTokenSession(cb, body) {
   sh.appendRow([sessionId, date || '', time || '', Number(tokens) || 0]);
   sh.getRange(newRowIdx, 3).setNumberFormat('@');
   return jsonp(cb, { ok: true, action: 'inserted' });
+}
+
+function writeTab(ss, name, header, rows) {
+  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clearContents();
+  const out = [header].concat(rows.map(function (r) {
+    return header.map(function (h) { return r[h] == null ? '' : r[h]; });
+  }));
+  sh.getRange(1, 1, out.length, header.length).setValues(out);
+}
+
+function jsonp(cb, obj) {
+  return ContentService.createTextOutput(cb + '(' + JSON.stringify(obj) + ')')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 ```
 
