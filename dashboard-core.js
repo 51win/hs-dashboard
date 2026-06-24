@@ -375,8 +375,8 @@
       var barH = Math.max(2, Math.round((v / max) * plotH));
       var x = padL + i * bw + bw * 0.1;
       var y = padT + (plotH - barH);
-      var tip = h + "시 · " + v.toLocaleString() + " tok";
-      return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.8) + '" height="' + barH + '" rx="2" fill="var(--primary-weak)">' +
+      var tip = h + "시 · " + fmtTok(v);
+      return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.8) + '" height="' + barH + '" rx="2" fill="var(--primary-weak)" data-tip="' + esc(tip) + '" style="cursor:default">' +
         '<title>' + esc(tip) + '</title></rect>' +
         '<text x="' + (x + bw * 0.4) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + h + '</text>';
     }).join("");
@@ -624,7 +624,7 @@
   }
   // 편집 사이트에서 변경 발생 시 디바운스로 자동 게시(올리기). file://에서도 JSONP로 동작.
   function schedulePush() {
-    if (MODE !== "edit") return;
+    if (MODE !== "edit" && !WRITE_ENDPOINT) return;
     if (typeof setTimeout !== "function") return;
     if (_pushTimer) { try { clearTimeout(_pushTimer); } catch (e) {} }
     _pushTimer = setTimeout(function () { _pushTimer = null; saveToSheet(); }, 2500);
@@ -760,6 +760,7 @@
         '<label class="tok-est"><input type="checkbox" class="tok-estimated"> 예상</label>' +
         '<button class="tok-add" type="button">추가</button>' +
       '</div><ul class="tok-list">' + tokRows + '</ul></div></div>' +
+      taskSessionsHtml(t.id) +
       '<div class="editor-actions"><button class="save-btn" type="button">저장</button></div>' +
       "</div>";
   }
@@ -774,21 +775,36 @@
 
   function smallHtml(data, group) {
     var today = todayStr();
-    var html = '<h2>' + esc(group.name) + '</h2><div class="small-list">';
-    tasksInGroup(data, group.id).forEach(function (t) {
+    var tasks = tasksInGroup(data, group.id);
+
+    // 정렬: 완료된 과제는 하단, 미완료는 D-day 오름차순(기한 없으면 마지막)
+    var active = [], bottom = [];
+    tasks.forEach(function (t) {
+      if (t.status === "done") { bottom.push(t); }
+      else { active.push(t); }
+    });
+    active.sort(function (a, b) {
+      var da = a.due, db = b.due;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return daysBetween(da, today) - daysBetween(db, today);
+    });
+    var sorted = active.concat(bottom);
+
+    function renderSmallRow(t) {
       var due = t.due || "";
       var label = ddayLabel(due, today);
       var badge = label ? '<span class="dday' + (isUrgent(due, today) ? " urgent" : "") + '">' + label + "</span>" : "";
       var doneCls = t.status === "done" ? " done" : "";
       if (!canEdit()) {
-        html += '<div class="small-row" data-task-id="' + t.id + '">' +
+        return '<div class="small-row" data-task-id="' + t.id + '">' +
           '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' disabled aria-label="완료">' +
           '<span class="sm-name-ro' + doneCls + '">' + esc(t.name) + "</span>" +
           (due ? '<span class="sm-due-ro">' + esc(due) + "</span>" : "") +
-          badge +
-          "</div>";
+          badge + "</div>";
       } else {
-        html += '<div class="small-row" data-task-id="' + t.id + '">' +
+        return '<div class="small-row" data-task-id="' + t.id + '">' +
           '<input type="checkbox" class="sm-done"' + (t.status === "done" ? " checked" : "") + ' aria-label="완료">' +
           '<input class="sm-name' + doneCls + '" value="' + esc(t.name) + '" aria-label="작은 과제 이름">' +
           '<input class="sm-due" type="date" value="' + esc(due) + '" aria-label="기한">' +
@@ -796,7 +812,24 @@
           '<button class="sm-del" type="button" aria-label="삭제">삭제</button>' +
           "</div>";
       }
-    });
+    }
+
+    var MAX_VISIBLE = 5;
+    var visible = sorted.slice(0, MAX_VISIBLE);
+    var rest = sorted.slice(MAX_VISIBLE);
+
+    var html = '<h2>' + esc(group.name) + '</h2><div class="small-list">';
+    visible.forEach(function (t) { html += renderSmallRow(t); });
+
+    if (rest.length > 0) {
+      if (_smallExpanded) {
+        rest.forEach(function (t) { html += renderSmallRow(t); });
+        html += '<button class="sm-collapse sm-expand" type="button">접기</button>';
+      } else {
+        html += '<button class="sm-expand" type="button">+ ' + rest.length + '개 더 보기</button>';
+      }
+    }
+
     if (canEdit()) html += '<button class="sm-add" type="button">+ 작은 과제 추가</button>';
     html += '</div>';
     return html;
@@ -880,10 +913,10 @@
       var h = Math.round((v / max) * plotH);
       var x = padL + i * bw + bw * 0.15;
       var y = padT + (plotH - h);
-      var tip = d.date.slice(5) + " · " + v.toLocaleString() + " tok";
+      var tip = d.date.slice(5) + " · " + fmtTok(v);
       var lbl = n <= 14 ? '<text x="' + (x + bw * 0.35) + '" y="' + (H - padB + 14) + '" class="ax" text-anchor="middle">' + esc(d.date.slice(5)) + "</text>" : "";
       return '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.7) + '" height="' + h +
-        '" rx="2" fill="var(--primary)"><title>' + esc(tip) + "</title></rect>" + lbl;
+        '" rx="2" fill="var(--primary)" data-tip="' + esc(tip) + '" style="cursor:default"><title>' + esc(tip) + "</title></rect>" + lbl;
     }).join("");
     return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="일별 토큰 추이">' +
       '<text x="' + padL + '" y="' + (padT + 4) + '" class="ax" text-anchor="end" dx="-4">' + esc(fmtTok(max)) + "</text>" +
@@ -911,6 +944,28 @@
   }
 
   // 세션별 목록 (날짜 + 시작 시각 + 토큰, cost 없음)
+  function taskSessionsHtml(taskId) {
+    if (!_tokenSessions || !_tokenSessions.length) return "";
+    var sessions = _tokenSessions.filter(function (s) { return s.taskId === taskId && s.date >= START_DATE; });
+    if (!sessions.length) return "";
+    var sorted = sessions.slice().sort(function (a, b) {
+      return (b.date + " " + (b.time || "00:00")).localeCompare(a.date + " " + (a.time || "00:00"));
+    });
+    var total = sorted.reduce(function (sum, s) { return sum + (Number(s.tokens) || 0); }, 0);
+    var rows = sorted.map(function (s) {
+      var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
+      return '<div class="tok-day-row tok-task-session-row">' +
+        '<span class="tok-day-date">' + when + '</span>' +
+        '<span class="tok-day-count">' + fmtTok(Number(s.tokens) || 0) + '</span>' +
+        (s.memo ? '<span class="tok-session-memo-ro">' + esc(s.memo) + '</span>' : '') +
+        '</div>';
+    }).join("");
+    return '<div class="fld tok-task-sessions">' +
+      '<span class="fld-label">연결된 토큰 세션 — 합계 ' + fmtTok(total) + '</span>' +
+      '<div class="tok-daily-list" style="margin-top:6px">' + rows + '</div>' +
+      '</div>';
+  }
+
   function sessionsHtml() {
     if (_tokenSessionsLoading) return '<div class="empty">불러오는 중...</div>';
     var sessions = _tokenSessions;
@@ -926,7 +981,28 @@
         '</datalist>'
       : "";
 
-    var rows = valid.slice(0, 100).map(function (s) {
+    // 정렬
+    var sorted = valid.slice();
+    if (_sessionSort === "usage") {
+      sorted.sort(function (a, b) { return (Number(b.tokens) || 0) - (Number(a.tokens) || 0); });
+    } else if (_sessionSort === "tag") {
+      sorted.sort(function (a, b) {
+        var ta = a.taskId || "", tb = b.taskId || "";
+        if (ta !== tb) return ta.localeCompare(tb);
+        return (b.date + " " + (b.time || "00:00")).localeCompare(a.date + " " + (a.time || "00:00"));
+      });
+    } else { // newest
+      sorted.sort(function (a, b) {
+        return (b.date + " " + (b.time || "00:00")).localeCompare(a.date + " " + (a.time || "00:00"));
+      });
+    }
+
+    var sortBar = '<div class="tok-sort-bar">' +
+      [["newest","최신순"],["usage","사용량순"],["tag","과제별"]].map(function (p) {
+        return '<button class="tok-sort-btn' + (_sessionSort === p[0] ? " active" : "") + '" data-sort="' + p[0] + '">' + p[1] + '</button>';
+      }).join("") + "</div>";
+
+    var rows = sorted.slice(0, 100).map(function (s) {
       var tk = fmtTok(Number(s.tokens) || 0);
       var when = s.time ? esc(s.date) + " " + esc(s.time) : esc(s.date);
       // 태그된 과제 이름 찾기
@@ -960,7 +1036,7 @@
       }
     }).join("");
 
-    return datalistHtml + '<div class="tok-daily-list">' + rows + '</div>';
+    return datalistHtml + sortBar + '<div class="tok-daily-list">' + rows + '</div>';
   }
 
   function weeklyHtml(series) {
@@ -1136,7 +1212,7 @@
     return data;
   }
 
-  var _state = null, _root = null, _bound = false, _tab = "board";
+  var _state = null, _root = null, _bound = false, _tab = "board", _sessionSort = "newest", _smallExpanded = false;
   function rerender() { render(_state, _root); }
   function setTab(tab) { _tab = tab; rerender(); }
   function openEditor(taskId) {
@@ -1168,11 +1244,50 @@
     } catch (e) { /* never throw on init */ }
     if (_bound) return;
     _bound = true;
+
+    // 그래프 hover 툴팁
+    var _chartTip = document.createElement("div");
+    _chartTip.id = "chart-tip";
+    _chartTip.className = "chart-tooltip";
+    document.body.appendChild(_chartTip);
+    rootEl.addEventListener("mouseover", function (e) {
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-tip")) {
+        _chartTip.textContent = e.target.getAttribute("data-tip");
+        _chartTip.classList.add("visible");
+      }
+    });
+    rootEl.addEventListener("mousemove", function (e) {
+      if (_chartTip.classList.contains("visible")) {
+        _chartTip.style.left = (e.clientX + 14) + "px";
+        _chartTip.style.top = (e.clientY - 34) + "px";
+      }
+    });
+    rootEl.addEventListener("mouseout", function (e) {
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-tip")) {
+        _chartTip.classList.remove("visible");
+      }
+    });
+
     rootEl.addEventListener("click", function (e) {
       if (e.target.classList && e.target.classList.contains("tab")) {
         var tab = e.target.getAttribute("data-tab");
         if (tab === "tokens") _pollingEnabled = true;
         setTab(tab);
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("tok-sort-btn")) {
+        _sessionSort = e.target.getAttribute("data-sort");
+        rerender();
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("sm-expand")) {
+        _smallExpanded = true;
+        rerender();
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains("sm-collapse")) {
+        _smallExpanded = false;
+        rerender();
         return;
       }
       if (e.target.classList && e.target.classList.contains("token-refresh")) {
@@ -1183,6 +1298,7 @@
       }
       if (e.target.classList && e.target.classList.contains("sheet-refresh")) {
         loadFromSheet(effectiveSheetId());
+        refreshTokensTab();
         return;
       }
       if (e.target.classList && e.target.classList.contains("admin-save")) {

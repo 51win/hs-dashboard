@@ -6,29 +6,38 @@
 <title>프로젝트 대시보드</title>
 <style>
   :root {
-    /* Surfaces & text */
-    --bg: oklch(1 0 0);
-    --surface: oklch(0.985 0.003 270);
-    --border: oklch(0.90 0.004 270);
-    --ink: oklch(0.22 0.02 270);
-    --ink-muted: oklch(0.46 0.02 270);
+    /* Sidebar palette */
+    --sidebar-bg: oklch(0.19 0.07 265);
+    --sidebar-surface: oklch(0.24 0.06 265);
+    --sidebar-border: oklch(0.28 0.05 265);
+    --sidebar-text: oklch(0.97 0.01 265);
+    --sidebar-muted: oklch(0.63 0.05 265);
+    --sidebar-hover: oklch(0.26 0.06 265);
+    --sidebar-w: 220px;
+
+    /* Main content */
+    --bg: oklch(0.965 0.005 265);
+    --surface: oklch(1 0 0);
+    --border: oklch(0.90 0.006 265);
+    --ink: oklch(0.22 0.02 265);
+    --ink-muted: oklch(0.50 0.02 265);
 
     /* Brand / action */
-    --primary: oklch(0.42 0.18 270);
-    --primary-weak: oklch(0.55 0.10 270);
-    --focus-ring: oklch(0.55 0.16 270);
+    --primary: oklch(0.44 0.19 265);
+    --primary-weak: oklch(0.57 0.11 265);
+    --focus-ring: oklch(0.57 0.16 265);
 
     /* Status colors (fill / text) */
-    --status-todo-bg: oklch(0.95 0.004 270);
-    --status-todo-ink: oklch(0.40 0.01 270);
-    --status-progress-bg: oklch(0.95 0.03 270);
-    --status-progress-ink: oklch(0.40 0.15 270);
-    --status-done-bg: oklch(0.95 0.04 150);
-    --status-done-ink: oklch(0.40 0.12 150);
+    --status-todo-bg: oklch(0.95 0.004 265);
+    --status-todo-ink: oklch(0.40 0.01 265);
+    --status-progress-bg: oklch(0.93 0.05 265);
+    --status-progress-ink: oklch(0.38 0.18 265);
+    --status-done-bg: oklch(0.93 0.05 150);
+    --status-done-ink: oklch(0.36 0.14 150);
     --risk-ink: oklch(0.45 0.16 25);
 
     /* Progress track */
-    --track: oklch(0.93 0.004 270);
+    --track: oklch(0.91 0.006 265);
 
     /* Type scale (fixed rem) */
     --fs-h1: 1.5rem;
@@ -38,14 +47,14 @@
     --fs-sub: 0.8125rem;
     --fs-micro: 0.6875rem;
 
-    --radius-card: 8px;
+    --radius-card: 10px;
     --radius-badge: 6px;
-    --radius-bar: 3px;
+    --radius-bar: 4px;
   }
 
   * { box-sizing: border-box; }
 
-  html { background: var(--bg); }
+  html { background: var(--sidebar-bg); }
 
   body {
     font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
@@ -57,61 +66,92 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* ─── App shell ─── */
   #app {
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 32px 24px 64px;
+    max-width: none;
+    margin: 0;
+    padding: 32px 40px 64px calc(var(--sidebar-w) + 40px);
+    min-height: 100vh;
   }
 
   h2 {
     font-size: var(--fs-h2);
     font-weight: 600;
     color: var(--ink);
-    margin: 32px 0 14px;
+    margin: 28px 0 12px;
     letter-spacing: -0.01em;
+    text-wrap: balance;
   }
-  h2:first-of-type { margin-top: 8px; }
 
-  /* App header: tabs (left) + utility actions (right) */
+  /* ─── Sidebar (appbar becomes fixed left nav) ─── */
   .appbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--sidebar-bg);
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
+    flex-direction: column;
+    border-bottom: none;
+    border-right: 1px solid var(--sidebar-border);
+    margin-bottom: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 100;
   }
+
+  /* Sidebar app title */
+  .appbar::before {
+    content: "대시보드";
+    display: block;
+    color: var(--sidebar-text);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    padding: 24px 16px 20px;
+    letter-spacing: -0.01em;
+    border-bottom: 1px solid var(--sidebar-border);
+    flex-shrink: 0;
+  }
+
+  /* ─── Sidebar bottom actions ─── */
   .bar-actions {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 7px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 14px 12px;
+    border-top: 1px solid var(--sidebar-border);
+    margin-top: auto;
   }
   #export-btn, .import-btn {
     font: inherit;
-    font-size: var(--fs-sub);
+    font-size: var(--fs-micro);
     font-weight: 500;
     border-radius: var(--radius-badge);
-    padding: 7px 14px;
+    padding: 8px 10px;
     cursor: pointer;
     transition: background 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
   }
   #export-btn {
-    color: var(--primary);
-    background: var(--surface);
-    border: 1px solid var(--border);
+    color: var(--sidebar-text);
+    background: var(--sidebar-hover);
+    border: 1px solid var(--sidebar-border);
   }
-  #export-btn:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  #export-btn:hover { background: oklch(0.30 0.06 265); border-color: oklch(0.36 0.06 265); }
   #export-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .import-btn {
-    display: inline-flex;
-    align-items: center;
-    color: var(--ink-muted);
+    color: var(--sidebar-muted);
     background: transparent;
-    border: 1px solid var(--border);
+    border: 1px solid var(--sidebar-border);
   }
-  .import-btn:hover { color: var(--ink); border-color: var(--primary-weak); }
+  .import-btn:hover { color: var(--sidebar-text); border-color: oklch(0.40 0.06 265); }
   .import-btn:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   /* Team grid 3x2 */
@@ -129,10 +169,13 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
     cursor: pointer;
-    transition: border-color 150ms ease-out, background 150ms ease-out;
+    transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
   }
-  .card { padding: 13px 14px; }
-  .card:hover, .row:hover { border-color: var(--primary-weak); }
+  .card { padding: 14px 16px; }
+  .card:hover, .row:hover {
+    border-color: var(--primary-weak);
+    box-shadow: 0 2px 8px oklch(0.44 0.19 265 / 0.07);
+  }
   .card:focus-visible, .row:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
@@ -158,7 +201,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 11px 14px;
+    padding: 12px 16px;
     margin-bottom: 8px;
   }
   .row .r-name {
@@ -298,33 +341,68 @@
   }
   .editor .cl-imp { margin-left: auto; }
 
-  /* Tabs */
+  /* ─── Vertical nav tabs (inside sidebar) ─── */
   .tabs {
     display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: none;
+    margin: 14px 10px;
+    flex: 1;
   }
-  .appbar .tabs { border-bottom: none; margin-bottom: -1px; }
+  .appbar .tabs { border-bottom: none; margin-bottom: 0; }
   .tab {
     font: inherit;
-    font-size: var(--fs-body);
+    font-size: var(--fs-sub);
     font-weight: 500;
-    color: var(--ink-muted);
+    color: var(--sidebar-muted);
     background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
-    padding: 9px 14px;
-    margin-bottom: -1px;
+    border-bottom: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 0;
     cursor: pointer;
-    transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
-    border-radius: var(--radius-badge) var(--radius-badge) 0 0;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: color 150ms ease-out, background 150ms ease-out;
+    line-height: 1.3;
+    white-space: nowrap;
   }
-  .tab:hover { color: var(--ink); background: var(--surface); }
+  /* Tab icons via mask */
+  .tab::before {
+    content: "";
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  .tab[data-tab="board"]::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='2' width='7' height='7' rx='1.5'/%3E%3Crect x='11' y='2' width='7' height='7' rx='1.5'/%3E%3Crect x='2' y='11' width='7' height='7' rx='1.5'/%3E%3Crect x='11' y='11' width='7' height='7' rx='1.5'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='2' width='7' height='7' rx='1.5'/%3E%3Crect x='11' y='2' width='7' height='7' rx='1.5'/%3E%3Crect x='2' y='11' width='7' height='7' rx='1.5'/%3E%3Crect x='11' y='11' width='7' height='7' rx='1.5'/%3E%3C/svg%3E");
+  }
+  .tab[data-tab="tokens"]::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='12' width='4' height='7' rx='1'/%3E%3Crect x='8' y='7' width='4' height='12' rx='1'/%3E%3Crect x='14' y='3' width='4' height='16' rx='1'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='12' width='4' height='7' rx='1'/%3E%3Crect x='8' y='7' width='4' height='12' rx='1'/%3E%3Crect x='14' y='3' width='4' height='16' rx='1'/%3E%3C/svg%3E");
+  }
+  .tab:hover {
+    color: var(--sidebar-text);
+    background: var(--sidebar-hover);
+  }
   .tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .tab[aria-selected="true"] {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
+    color: var(--sidebar-text);
+    background: var(--sidebar-hover);
+    border-bottom: none;
   }
 
   /* Today panel (landing) */
@@ -364,7 +442,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
-    padding: 10px 14px;
+    padding: 10px 16px;
   }
   .today-row .t-task {
     font-size: var(--fs-sub);
@@ -457,7 +535,7 @@
     padding: 6px 12px; cursor: pointer; margin-top: 4px;
     transition: border-color 150ms ease-out, background 150ms ease-out;
   }
-  .sm-add:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  .sm-add:hover { border-color: var(--primary-weak); background: oklch(0.97 0.005 265); }
   .sm-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   /* Editor save action */
@@ -468,7 +546,7 @@
     border-radius: var(--radius-badge); padding: 7px 16px; cursor: pointer;
     transition: background 150ms ease-out, border-color 150ms ease-out;
   }
-  .editor .save-btn:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
+  .editor .save-btn:hover { background: oklch(0.40 0.19 265); border-color: oklch(0.40 0.19 265); }
   .editor .save-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
   /* Editor field labels */
@@ -533,7 +611,7 @@
     transition: background 150ms ease-out, border-color 150ms ease-out;
   }
   .editor .cl-add:hover,
-  .editor .tok-add:hover { background: oklch(0.96 0.006 270); border-color: var(--primary-weak); }
+  .editor .tok-add:hover { background: oklch(0.97 0.005 265); border-color: var(--primary-weak); }
   .editor .cl-add:focus-visible,
   .editor .tok-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .editor .tok-edit {
@@ -637,7 +715,7 @@
   .sheet-connect:hover,
   .sheet-refresh:hover,
   .sheet-disconnect:hover,
-  .token-refresh:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  .token-refresh:hover { border-color: var(--primary-weak); background: oklch(0.97 0.005 265); }
   .sheet-connect:focus-visible,
   .sheet-refresh:focus-visible,
   .sheet-disconnect:focus-visible,
@@ -654,7 +732,7 @@
     padding: 7px 14px; cursor: pointer;
     transition: background 150ms ease-out, border-color 150ms ease-out;
   }
-  .admin-login:hover, .admin-logout:hover { border-color: var(--primary-weak); background: oklch(0.96 0.006 270); }
+  .admin-login:hover, .admin-logout:hover { border-color: var(--primary-weak); background: oklch(0.97 0.005 265); }
   .admin-login:focus-visible, .admin-logout:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .admin-save {
     font: inherit; font-size: var(--fs-sub); font-weight: 500; color: #fff;
@@ -662,7 +740,7 @@
     border-radius: var(--radius-badge); padding: 7px 14px; cursor: pointer;
     transition: background 150ms ease-out, border-color 150ms ease-out;
   }
-  .admin-save:hover { background: oklch(0.38 0.18 270); border-color: oklch(0.38 0.18 270); }
+  .admin-save:hover { background: oklch(0.40 0.19 265); border-color: oklch(0.40 0.19 265); }
   .admin-save:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .sheet-banner.admin { background: var(--status-progress-bg); border-color: var(--primary-weak); }
   .sheet-banner .save-msg { font-size: var(--fs-sub); color: var(--ink-muted); margin-left: 4px; }
@@ -707,7 +785,7 @@
   .tok-day-row {
     display: flex; align-items: center; gap: 12px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-card); padding: 9px 14px;
+    border-radius: var(--radius-card); padding: 9px 16px;
   }
   .tok-day-date { font-size: var(--fs-sub); font-weight: 500; color: var(--ink); flex: 0 0 90px; }
   .tok-day-count { font-size: var(--fs-sub); font-weight: 600; color: var(--primary); flex: 0 0 90px; }
@@ -748,6 +826,66 @@
   }
   .tok-session-tag-ro { margin-right: 4px; font-weight: 500; }
 
+  /* 그래프 커스텀 툴팁 */
+  .chart-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--ink);
+    color: #fff;
+    font-size: var(--fs-micro);
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: var(--radius-badge);
+    white-space: nowrap;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+    letter-spacing: 0.02em;
+  }
+  .chart-tooltip.visible { opacity: 1; }
+
+  /* 세션 정렬 바 */
+  .tok-sort-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .tok-sort-btn {
+    font: inherit;
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    color: var(--ink-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color 150ms ease-out, border-color 150ms ease-out;
+  }
+  .tok-sort-btn.active { color: var(--primary); border-color: var(--primary-weak); }
+  .tok-sort-btn:hover { color: var(--ink); border-color: var(--primary-weak); }
+
+  /* 과제 탭 연결 세션 섹션 */
+  .tok-task-sessions { margin-top: 2px; }
+  .tok-task-session-row { background: var(--bg); }
+
+  /* 작은 과제 접기/펼치기 */
+  .sm-expand, .sm-collapse {
+    align-self: flex-start;
+    font: inherit;
+    font-size: var(--fs-sub);
+    font-weight: 500;
+    color: var(--ink-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 6px 12px;
+    cursor: pointer;
+    margin-top: 2px;
+    transition: color 150ms ease-out, border-color 150ms ease-out;
+  }
+  .sm-expand:hover, .sm-collapse:hover { color: var(--ink); border-color: var(--primary-weak); }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       transition: none !important;
@@ -760,7 +898,7 @@
 <div id="app"></div>
 <script>
   window.DASHBOARD_MODE = "view";
-  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyIonN5L-ol5KyZou9W8WmA5W18npsSh-rrWGl6Q4tJSLqutwNgA6dgeA_rMQqff9_w_A/exec";
+  window.DASHBOARD_WRITE_ENDPOINT = "https://script.google.com/macros/s/AKfycbyj9suuBJfr9YygI73wP4aygBtUlNvedOP__0heEBYE7_Vx2F-TtUB7c9aN7_8R7rDu5w/exec";
   window.DASHBOARD_READ_ENDPOINT = window.DASHBOARD_WRITE_ENDPOINT;
 </script>
 <script src="dashboard-core.js"></script>
